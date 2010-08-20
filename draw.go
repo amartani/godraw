@@ -35,30 +35,38 @@ func ClickProcessor (click <-chan image.Point, out chan<- Drawable) {
     }
 }
 
+// Draw line on the surface
+// Uses Bresenham's algorithm
 func (line Line) Draw(surface draw.Image) {
     fmt.Println("Line: (", line.start.X, ", ", line.start.Y, ") - (", line.end.X, ", ", line.end.Y, ")")
     start := line.start
     end := line.end
-    diff := end.Sub(start)
-    if abs(diff.X) > abs(diff.Y) {
-        if start.X > end.X {
-            start, end = end, start
-            diff = end.Sub(start)
-        }
-        delta := float(diff.Y)/float(diff.X)
-        for x := start.X; x != end.X; x++ {
-            y := start.Y + int(float(x - start.X)*delta)
+    steep := abs(end.Y - start.Y) > abs(end.X - start.X)
+    if steep {
+        start.X, start.Y = start.Y, start.X
+        end.X, end.Y = end.Y, end.X
+    }
+    if start.X > end.X {
+        start, end = end, start
+    }
+    deltax := end.X - start.X
+    deltay := abs(end.Y - start.Y)
+    error := deltax/2
+    y := start.Y
+    ystep := 1
+    if start.Y > end.Y {
+        ystep = -1
+    }
+    for x := start.X; x<end.X; x++ {
+        if steep {
+            surface.Set(y, x, image.RGBAColor{255, 255, 255, 255})
+        } else {
             surface.Set(x, y, image.RGBAColor{255, 255, 255, 255})
         }
-    } else {
-        if start.Y > end.Y {
-            start, end = end, start
-            diff = end.Sub(start)
-        }
-        delta := float(diff.X)/float(diff.Y)
-        for y := start.Y; y != end.Y; y++ {
-            x := start.X + int(float(y - start.Y)*delta)
-            surface.Set(x, y, image.RGBAColor{255, 255, 255, 255})
+        error = error - deltay
+        if error < 0 {
+            y += ystep
+            error += deltax
         }
     }
 }
