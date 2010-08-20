@@ -26,15 +26,6 @@ type Drawable interface {
     Draw(draw.Image)
 }
 
-func ClickProcessor (click <-chan image.Point, out chan<- Drawable) {
-    var start, end image.Point
-    for {
-        start = <-click
-        end = <-click
-        out <- Line{start, end}
-    }
-}
-
 // Draw line on the surface
 // Uses Bresenham's algorithm
 func (line Line) Draw(surface draw.Image) {
@@ -71,24 +62,38 @@ func (line Line) Draw(surface draw.Image) {
     }
 }
 
-func MouseHandler(mousechan <-chan draw.Mouse, out chan<- image.Point) {
-    for {
-        mouse := <-mousechan
-        if mouse.Buttons & 1<<0 == 1<<0 { // botao esquerdo
-            fmt.Println("Click: ", mouse.X, ", ", mouse.Y)
-            out <- mouse.Point
+func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
+    out := make(chan image.Point)
+    go func() {
+        for {
+            mouse := <-mousechan
+            if mouse.Buttons & 1<<0 == 1<<0 { // botao esquerdo
+                fmt.Println("Click: ", mouse.X, ", ", mouse.Y)
+                out <- mouse.Point
+            }
         }
-    }
+    }()
+    return out
 }
 
+func ClickProcessor (click <-chan image.Point) chan Drawable {
+    out := make(chan Drawable)
+    go func() {
+        var start, end image.Point
+        for {
+            start = <-click
+            end = <-click
+            out <- Line{start, end}
+        }
+    }()
+    return out
+}
 
 func main() {
     context, _ := x11.NewWindow()
-    drawablechan := make(chan Drawable)
-    clickchan := make(chan image.Point)
     context.FlushImage()
-    go MouseHandler(context.MouseChan(), clickchan)
-    go ClickProcessor(clickchan, drawablechan)
+    clickchan := MouseHandler(context.MouseChan())
+    drawablechan := ClickProcessor(clickchan)
     for {
         select {
         case object := <-drawablechan:
@@ -100,3 +105,4 @@ func main() {
         }
     }
 }
+
