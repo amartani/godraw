@@ -6,6 +6,7 @@ import (
     "exp/draw"
     "image"
     "math"
+    "os"
 )
 
 func abs(n int) int {
@@ -79,10 +80,9 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
 func ClickProcessor (click <-chan image.Point) chan Drawable {
     out := make(chan Drawable)
     go func() {
-        var start, end image.Point
         for {
-            start = <-click
-            end = <-click
+            start := <-click
+            end := <-click
             out <- Line{start, end}
         }
     }()
@@ -101,6 +101,7 @@ func main() {
             context.FlushImage()
         case <-context.QuitChan():
             fmt.Println("Quit")
+	    os.Exit(0)
             return
         }
     }
