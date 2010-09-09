@@ -65,11 +65,16 @@ func (line Line) Draw(surface draw.Image) {
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     out := make(chan image.Point)
     go func() {
+        clicked := false
         for {
             mouse := <-mousechan
-            if mouse.Buttons & 1<<0 == 1<<0 { // botao esquerdo
+            if clicked == false && mouse.Buttons & 1<<0 == 1<<0 { // botao esquerdo
+                clicked = true
                 fmt.Println("Click: ", mouse.X, ", ", mouse.Y)
                 out <- mouse.Point
+            }
+            if clicked == true && mouse.Buttons & 1<<0 == 0 {
+                clicked = false
             }
         }
     }()
