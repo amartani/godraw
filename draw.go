@@ -81,24 +81,55 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     return out
 }
 
-func ClickProcessor (click <-chan image.Point) chan Drawable {
+func EventProcessor (clickchan <-chan image.Point, kbchan <-chan int) chan Drawable {
     out := make(chan Drawable)
+    abort := make(chan bool)
+    aborted := make(chan bool)
     go func() {
-        var start, end image.Point
         for {
-            start = <-click
-            end = <-click
-            out <- Line{start, end}
+            select {
+            case keyevent := <-kbchan:
+                fmt.Println("Apertou: ", keyevent)
+                if keyevent == 'l' {
+                    abort <- true
+                    <- aborted
+                    clickchan = LineCreator(clickchan, ...)
+                    go LineCreator(clickchan, abort, out, aborted)
+                }
+            }
         }
     }()
+
+    go func() {
+        <- abort
+        aborted <- true
+    }()
+
     return out
 }
+
+func LineCreator (click <-chan image.Point, abortchan <-chan bool, out chan<- Drawable, aborted chan<- bool) {
+    pa := [2]image.Point{}
+    for i:=0; i<2; i++ {
+        select {
+        case p := <-click:
+            pa[i] = p
+        case <-abortchan:
+            aborted <- true
+            return
+        }
+    }
+    out <- Line{pa[0], pa[1]}
+    <- abortchan
+    aborted <- true
+}
+
 
 func main() {
     context, _ := x11.NewWindow()
     context.FlushImage()
     clickchan := MouseHandler(context.MouseChan())
-    drawablechan := ClickProcessor(clickchan)
+    drawablechan := EventProcessor(clickchan, context.KeyboardChan())
     for {
         select {
         case object := <-drawablechan:
