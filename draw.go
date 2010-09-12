@@ -93,7 +93,6 @@ func EventProcessor (clickchan <-chan image.Point, kbchan <-chan int) chan Drawa
                 if keyevent == 'l' {
                     abort <- true
                     <- aborted
-                    clickchan = LineCreator(clickchan, ...)
                     go LineCreator(clickchan, abort, out, aborted)
                 }
             }
