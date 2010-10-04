@@ -1,6 +1,5 @@
 // vim: tabstop=4 expandtab
 
-
 package main
 
 import (
@@ -9,7 +8,32 @@ import (
     "exp/draw"
     "image"
     "math"
+    "container/list"
 )
+
+const (
+    HMAX = 600
+    WMAX = 800
+)
+
+var matrix =  new([WMAX][HMAX]list.List)
+
+func PushMatrix (point image.Point, draw Drawable) {
+    matrix[point.X][point.Y].PushFront(draw)
+}
+
+func TopMatrix (point image.Point) Drawable {
+    return matrix[point.X][point.Y].Front().Value.(Drawable)
+}
+
+func PopMatrix (point image.Point) Drawable {
+    element := matrix[point.X][point.Y].Front()
+    if element != nil {
+        matrix[point.X][point.Y].Remove(element)
+        return element.Value.(Drawable)
+    }
+    return nil
+}
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
 
@@ -56,8 +80,10 @@ func (line Line) Draw(surface draw.Image) {
     }
     for x := start.X; x<end.X; x++ {
         if steep {
+            PushMatrix(image.Point{y, x}, line)
             surface.Set(y, x, line.color)
         } else {
+            PushMatrix(image.Point{x, y}, line)
             surface.Set(x, y, line.color)
         }
         error = error - deltay
@@ -101,6 +127,9 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
                 case 'c':
                     SetColor(kbchan)
                     break
+                case 'd':
+                    Delete(clickchan, kbchan, out)
+                    break
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -110,6 +139,25 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
 
    return out
 }
+
+func Delete (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+    fmt.Println("Apagar objeto")
+    for {
+    select {
+        case p := <-clickchan:
+            drawable := PopMatrix(p)
+            if drawable != nil {
+                line := drawable.(Line)
+                line.color = image.RGBAColor{0, 0, 0, 0}
+                out <- line
+                return
+            }
+        case <-kbchan:
+            return
+    }
+    }
+}
+
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
     fmt.Println("Desenhar linha")
