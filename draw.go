@@ -1,4 +1,5 @@
-// vim: tabstop=4 expandtab
+/* Go draw! */
+/* vim: set ts=4 sts=4 sw=4 et: */
 
 package main
 
@@ -14,6 +15,7 @@ import (
 const (
     HMAX = 600
     WMAX = 800
+    SEARCH_RADIUS = 6
 )
 
 var matrix =  new([WMAX][HMAX]list.List)
@@ -33,6 +35,10 @@ func PopMatrix (point image.Point) Drawable {
         return element.Value.(Drawable)
     }
     return nil
+}
+
+func SearchNearPoint (point image.Point) Drawable {
+
 }
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
