@@ -27,7 +27,7 @@ type Line struct {
 }
 
 type Poligon struct {
-    points [10]image.Point
+    points [50]image.Point
     color image.RGBAColor
     dotted bool
 }
@@ -123,6 +123,29 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
 
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
     fmt.Println("Desenhar Poligono")
+    points := [50]image.Point{}
+    i := 0
+    for_breaker := false
+    for i = 0 ; i < 50; i++ {
+        select {
+        case p := <-clickchan:
+            fmt.Println("Ponto para poligono")
+            points[i] = p
+            if i > 0 {
+                out <- Line{points[i-1], points[i], currentColor, dottedLine}
+            }
+        case <- kbchan:
+            for_breaker = true
+            break
+        }
+        if for_breaker {
+            break
+        }
+    }
+    if i > 0 {
+        out <- Line{points[i-1], points[0], currentColor, dottedLine}
+       // Poligon{points, currentColor, dottedLine}
+    }
 }
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
