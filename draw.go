@@ -25,7 +25,11 @@ func PushMatrix (point image.Point, draw Drawable) {
 }
 
 func TopMatrix (point image.Point) Drawable {
-    return matrix[point.X][point.Y].Front().Value.(Drawable)
+    element := matrix[point.X][point.Y].Front()
+    if element != nil {
+        return element.Value.(Drawable)
+    }
+    return nil
 }
 
 func PopMatrix (point image.Point) Drawable {
@@ -38,7 +42,17 @@ func PopMatrix (point image.Point) Drawable {
 }
 
 func SearchNearPoint (point image.Point) Drawable {
-
+    for radius := 0; radius < SEARCH_RADIUS; radius++ {
+        for x := point.X - radius; x <= point.X + radius; x++ {
+            for y := point.Y - radius; y <= point.Y + radius; y++ {
+                drawable := TopMatrix(image.Point{x, y})
+                if drawable != nil {
+                    return drawable
+                }
+            }
+        }
+    }
+    return nil
 }
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
@@ -188,7 +202,7 @@ func Delete (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable)
     for {
     select {
         case p := <-clickchan:
-            drawable := PopMatrix(p)
+            drawable := SearchNearPoint(p)
             if drawable != nil {
                 line := drawable.(Line)
                 line.color = image.RGBAColor{0, 0, 0, 0}
