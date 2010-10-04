@@ -1,4 +1,5 @@
-// vim: tabspace=4 expandtabs
+// vim: tabstop=4 expandtab
+
 
 package main
 
@@ -90,8 +91,10 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
             select {
             case keyevent := <-kbchan:
                 fmt.Println("Apertou: ", keyevent)
-                if keyevent == 'l' {
+                switch keyevent {
+                case 'l':
                     LineCreator(clickchan, kbchan, out)
+                    break
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
