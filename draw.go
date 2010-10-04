@@ -36,6 +36,7 @@ func PopMatrix (point image.Point) Drawable {
 }
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
+var dottedLine   = true
 
 func abs(n int) int {
     if n>0 { return n }
@@ -46,6 +47,13 @@ type Line struct {
     start image.Point
     end image.Point
     color image.RGBAColor
+    dotted bool
+}
+
+type Poligon struct {
+    points [50]image.Point
+    color image.RGBAColor
+    dotted bool
 }
 
 func (a Line) length() float64 {
@@ -130,6 +138,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
                 case 'd':
                     Delete(clickchan, kbchan, out)
                     break
+                case 'p':
+                    PoligonCreator(clickchan, kbchan, out)
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -138,6 +148,33 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
     }()
 
    return out
+}
+
+func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+    fmt.Println("Desenhar Poligono")
+    points := [50]image.Point{}
+    i := 0
+    for_breaker := false
+    for i = 0 ; i < 50; i++ {
+        select {
+        case p := <-clickchan:
+            fmt.Println("Ponto para poligono")
+            points[i] = p
+            if i > 0 {
+                out <- Line{points[i-1], points[i], currentColor, dottedLine}
+            }
+        case <- kbchan:
+            for_breaker = true
+            break
+        }
+        if for_breaker {
+            break
+        }
+    }
+    if i > 0 {
+        out <- Line{points[i-1], points[0], currentColor, dottedLine}
+       // Poligon{points, currentColor, dottedLine}
+    }
 }
 
 func Delete (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
@@ -172,22 +209,26 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Draw
             return
         }
     }
-    out <- Line{pa[0], pa[1], currentColor}
+    out <- Line{pa[0], pa[1], currentColor, dottedLine}
 }
 
 func SetColor (kbchan chan int) {
     switch <- kbchan {
     case 'r':
         currentColor = image.RGBAColor{255, 0, 0, 255}
+        fmt.Println("Vermelho selecionado")
         break
     case 'g':
         currentColor = image.RGBAColor{0, 255, 0, 255}
+        fmt.Println("Verde selecionado")
         break
     case 'b':
         currentColor = image.RGBAColor{0, 0, 255, 255}
+        fmt.Println("Azul selecionado")
         break
     case 'w':
         currentColor = image.RGBAColor{255, 255, 255, 255}
+        fmt.Println("Branco selecionado")
     }
 }
 
