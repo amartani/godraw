@@ -131,15 +131,19 @@ func SetColor (kbchan chan int) {
     switch <- kbchan {
     case 'r':
         currentColor = image.RGBAColor{255, 0, 0, 255}
+        fmt.Println("Vermelho selecionado")
         break
     case 'g':
         currentColor = image.RGBAColor{0, 255, 0, 255}
+        fmt.Println("Verde selecionado")
         break
     case 'b':
         currentColor = image.RGBAColor{0, 0, 255, 255}
+        fmt.Println("Azul selecionado")
         break
     case 'w':
         currentColor = image.RGBAColor{255, 255, 255, 255}
+        fmt.Println("Branco selecionado")
     }
 }
 
