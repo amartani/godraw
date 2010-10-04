@@ -71,7 +71,7 @@ type Line struct {
 }
 
 type Poligon struct {
-    points [50]image.Point
+    points list.List
     color image.RGBAColor
     dotted bool
 }
@@ -172,16 +172,22 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
 
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
     fmt.Println("Desenhar Poligono")
-    points := [50]image.Point{}
+    points := new(list.List)
     i := 0
     for_breaker := false
+    var p1 image.Point
+    var p2 image.Point
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
             fmt.Println("Ponto para poligono")
-            points[i] = p
+            points.PushFront(p)
             if i > 0 {
-                out <- Line{points[i-1], points[i], currentColor, dottedLine}
+                p1 = p2
+                p2 = p
+                out <- Line{p1, p2, currentColor, dottedLine}
+            }else{
+                p2 = p
             }
         case <- kbchan:
             for_breaker = true
@@ -192,7 +198,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- D
         }
     }
     if i > 0 {
-        out <- Line{points[i-1], points[0], currentColor, dottedLine}
+        out <- Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine}
        // Poligon{points, currentColor, dottedLine}
     }
 }
@@ -202,7 +208,7 @@ func Delete (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable)
     for {
     select {
         case p := <-clickchan:
-            drawable := SearchNearPoint(p)
+            drawable := PopMatrix(p)
             if drawable != nil {
                 line := drawable.(Line)
                 line.color = image.RGBAColor{0, 0, 0, 0}
