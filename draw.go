@@ -11,6 +11,8 @@ import (
     "math"
 )
 
+var currentColor = image.RGBAColor{255, 255, 255, 255}
+
 func abs(n int) int {
     if n>0 { return n }
     return -n
@@ -19,6 +21,7 @@ func abs(n int) int {
 type Line struct {
     start image.Point
     end image.Point
+    color image.RGBAColor
 }
 
 func (a Line) length() float64 {
@@ -53,9 +56,9 @@ func (line Line) Draw(surface draw.Image) {
     }
     for x := start.X; x<end.X; x++ {
         if steep {
-            surface.Set(y, x, image.RGBAColor{255, 255, 255, 255})
+            surface.Set(y, x, line.color)
         } else {
-            surface.Set(x, y, image.RGBAColor{255, 255, 255, 255})
+            surface.Set(x, y, line.color)
         }
         error = error - deltay
         if error < 0 {
@@ -95,6 +98,9 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
                 case 'l':
                     LineCreator(clickchan, kbchan, out)
                     break
+                case 'c':
+                    SetColor(kbchan)
+                    break
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -102,7 +108,7 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
         }
     }()
 
-    return out
+   return out
 }
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
@@ -118,7 +124,23 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Draw
             return
         }
     }
-    out <- Line{pa[0], pa[1]}
+    out <- Line{pa[0], pa[1], currentColor}
+}
+
+func SetColor (kbchan chan int) {
+    switch <- kbchan {
+    case 'r':
+        currentColor = image.RGBAColor{255, 0, 0, 255}
+        break
+    case 'g':
+        currentColor = image.RGBAColor{0, 255, 0, 255}
+        break
+    case 'b':
+        currentColor = image.RGBAColor{0, 0, 255, 255}
+        break
+    case 'w':
+        currentColor = image.RGBAColor{255, 255, 255, 255}
+    }
 }
 
 // Turns kbchan into a read and writable chan
