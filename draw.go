@@ -81,54 +81,60 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     return out
 }
 
-func EventProcessor (clickchan <-chan image.Point, kbchan <-chan int) chan Drawable {
+func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawable {
     out := make(chan Drawable)
-    abort := make(chan bool)
-    aborted := make(chan bool)
     go func() {
         for {
             select {
             case keyevent := <-kbchan:
                 fmt.Println("Apertou: ", keyevent)
                 if keyevent == 'l' {
-                    abort <- true
-                    <- aborted
-                    go LineCreator(clickchan, abort, out, aborted)
+                    LineCreator(clickchan, kbchan, out)
                 }
+//            case <-clickchan:
+//               fmt.Println("Outro clique")
             }
         }
-    }()
-
-    go func() {
-        <- abort
-        aborted <- true
     }()
 
     return out
 }
 
-func LineCreator (click <-chan image.Point, abortchan <-chan bool, out chan<- Drawable, aborted chan<- bool) {
+func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+    fmt.Println("Desenhar linha")
     pa := [2]image.Point{}
     for i:=0; i<2; i++ {
+        fmt.Println("Ponto inicial")
         select {
-        case p := <-click:
+        case p := <-clickchan:
+            fmt.Println("clique para linha")
             pa[i] = p
-        case <-abortchan:
-            aborted <- true
+        case key := <-kbchan:
+            kbchan <- key
             return
         }
     }
     out <- Line{pa[0], pa[1]}
-    <- abortchan
-    aborted <- true
+}
+
+// Turns kbchan into a read and writable chan
+func RWKBChan (kbchan <-chan int) chan int {
+    rwchan := make(chan int);
+    go func() {
+        for {
+            rwchan <- <- kbchan;
+        }
+    }()
+    return rwchan;
 }
 
 
 func main() {
     context, _ := x11.NewWindow()
     context.FlushImage()
+    kbchan := RWKBChan(context.KeyboardChan());
     clickchan := MouseHandler(context.MouseChan())
-    drawablechan := EventProcessor(clickchan, context.KeyboardChan())
+    drawablechan := EventProcessor(clickchan, kbchan)
     for {
         select {
         case object := <-drawablechan:
