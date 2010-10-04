@@ -12,6 +12,7 @@ import (
 )
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
+var dottedLine   = true
 
 func abs(n int) int {
     if n>0 { return n }
@@ -22,6 +23,13 @@ type Line struct {
     start image.Point
     end image.Point
     color image.RGBAColor
+    dotted bool
+}
+
+type Poligon struct {
+    points [10]image.Point
+    color image.RGBAColor
+    dotted bool
 }
 
 func (a Line) length() float64 {
@@ -101,6 +109,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
                 case 'c':
                     SetColor(kbchan)
                     break
+                case 'p':
+                    PoligonCreator(clickchan, kbchan, out)
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -109,6 +119,10 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
     }()
 
    return out
+}
+
+func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+    fmt.Println("Desenhar Poligono")
 }
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
@@ -124,7 +138,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Draw
             return
         }
     }
-    out <- Line{pa[0], pa[1], currentColor}
+    out <- Line{pa[0], pa[1], currentColor, dottedLine}
 }
 
 func SetColor (kbchan chan int) {
