@@ -1,3 +1,5 @@
+// vim: tabspace=4 expandtabs
+
 package main
 
 import (
@@ -91,8 +93,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
                 if keyevent == 'l' {
                     LineCreator(clickchan, kbchan, out)
                 }
-//            case <-clickchan:
-//               fmt.Println("Outro clique")
+            case <-clickchan:
+               fmt.Println("Outro clique")
             }
         }
     }()
@@ -109,8 +111,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Draw
         case p := <-clickchan:
             fmt.Println("clique para linha")
             pa[i] = p
-        case key := <-kbchan:
-            kbchan <- key
+        case <-kbchan:
             return
         }
     }
@@ -122,7 +123,10 @@ func RWKBChan (kbchan <-chan int) chan int {
     rwchan := make(chan int);
     go func() {
         for {
-            rwchan <- <- kbchan;
+            key := <-kbchan;
+            if key > 0 {
+                rwchan <-key;
+            }
         }
     }()
     return rwchan;
