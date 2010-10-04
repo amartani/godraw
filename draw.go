@@ -25,7 +25,11 @@ func PushMatrix (point image.Point, draw Drawable) {
 }
 
 func TopMatrix (point image.Point) Drawable {
-    return matrix[point.X][point.Y].Front().Value.(Drawable)
+    element := matrix[point.X][point.Y].Front()
+    if element != nil {
+        return element.Value.(Drawable)
+    }
+    return nil
 }
 
 func PopMatrix (point image.Point) Drawable {
@@ -38,6 +42,16 @@ func PopMatrix (point image.Point) Drawable {
 }
 
 func SearchNearPoint (point image.Point) Drawable {
+    for radius := 0; radius < SEARCH_RADIUS; radius++ {
+        for x := point.X - radius; x <= point.X + radius; x++ {
+            for y := point.Y - radius; y <= point.Y + radius; y++ {
+                drawable := TopMatrix(image.Point{x, y})
+                if drawable != nil {
+                    return drawable
+                }
+            }
+        }
+    }
     return nil
 }
 
