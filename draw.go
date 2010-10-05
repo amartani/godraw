@@ -19,11 +19,15 @@ const (
     SEARCH_RADIUS = 10
 )
 
+var counter_id = 0
+
 var matrix =  new([WMAX][HMAX]list.List)
 
 /* Functions for the Matrix */
 
 func PushMatrix (point image.Point, draw Drawable) {
+    counter_id++
+    draw.SetId(counter_id)
     matrix[point.X][point.Y].PushFront(draw)
 }
 
@@ -65,7 +69,7 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
         if reflect.Typeof(elem.Value) != reflect.Typeof(subject) {
             continue
         }
-        if elem.Value == subject {
+	if elem.Value.(Drawable).Id() == subject.(Drawable).Id() {
             fmt.Println("Found")
             return elem
         }
@@ -113,12 +117,14 @@ type Line struct {
     end image.Point
     color image.RGBAColor
     dotted bool
+    id int
 }
 
 type Poligon struct {
     points *list.List
     color image.RGBAColor
     dotted bool
+    id int
 }
 
 type ColorPoint struct {
@@ -132,6 +138,8 @@ func (a Line) length() float64 {
 
 type Drawable interface {
     PointChan() chan ColorPoint
+    Id() int
+    SetId(int)
 }
 
 func (colorpoint ColorPoint) Valid() bool {
@@ -139,6 +147,22 @@ func (colorpoint ColorPoint) Valid() bool {
         return false
     }
     return true
+}
+
+func (line *Line) Id() int {
+    return line.id
+}
+
+func (poligon Poligon) Id() int {
+    return poligon.id
+}
+
+func (line *Line) SetId(id int) {
+    line.id = id
+}
+
+func (poligon Poligon) SetId(id int) {
+    poligon.id = id
 }
 
 // Draw line on the surface
@@ -236,7 +260,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     for_breaker := false
     var p1 image.Point
     var p2 image.Point
-    poligon := Poligon{points, currentColor, dottedLine}
+    poligon := Poligon{points, currentColor, dottedLine, 0}
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
@@ -245,7 +269,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
             if i > 0 {
                 p1 = p2
                 p2 = p
-                line := Line{p1, p2, currentColor, dottedLine}
+                line := Line{p1, p2, currentColor, dottedLine, 0}
                 out <- RegisterPoints(line.PointChan(), poligon)
             } else {
                 p2 = p
@@ -259,7 +283,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
         }
     }
     if i > 0 {
-        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine}
+        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine, 0}
         out <- RegisterPoints(line.PointChan(), poligon)
     }
 }
@@ -275,7 +299,7 @@ func (poligon Poligon) PointChan() chan ColorPoint {
             aftertemp := <-points
             if aftertemp == nil { break }
             after = aftertemp.(image.Point)
-            line := Line{before, after, poligon.color, poligon.dotted}
+            line := Line{before, after, poligon.color, poligon.dotted, 0}
             linechan := line.PointChan()
             for ! closed(linechan) {
                 outchan <- <- linechan
@@ -283,7 +307,7 @@ func (poligon Poligon) PointChan() chan ColorPoint {
             before = after
         }
         // Line to close poligon
-        line := Line{before, first, poligon.color, poligon.dotted}
+        line := Line{before, first, poligon.color, poligon.dotted, 0}
         linechan := line.PointChan()
         for ! closed(linechan) {
             outchan <- <- linechan
@@ -343,7 +367,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
             return
         }
     }
-    line := Line{pa[0], pa[1], currentColor, dottedLine}
+    line := Line{pa[0], pa[1], currentColor, dottedLine, 0}
     out <- RegisterPoints(line.PointChan(), &line)
 }
 
