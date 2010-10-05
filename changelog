@@ -11,3 +11,11 @@ assim ele envia os pontos da linha pra fora mas registra o poligon
 invalido. Pode dar um close(canal) e verificar com closed(canal)
 - Renomeei Delete para DeleteHandler
 - Delete funcionando, basta que os objetos retornem o LineChan certinho
+- Delete estava funcionando. Tentei fazer a RemoveFromMatrix, que retira
+as referencias dela. Já tentei pra caralho, mas não sei porque o negócio
+trava com poligono, mas vai bonitinho com retas. Pela mensagem de erro,
+acho que tem a ver com o fato do poligono ter um ponteiro no struct dele,
+enquanto que a Line não. Mas não sei mais o que fazer... De qualquer forma,
+com a reta tá funcionando, e se comentar a linha 321 (RemoveFromMatrix)
+também funciona com poligono, só que as figuras vao continuar existindo
+no mapa de bits.

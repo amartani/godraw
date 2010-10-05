@@ -10,6 +10,7 @@ import (
     "image"
     "math"
     "container/list"
+    "reflect"
 )
 
 const (
@@ -61,6 +62,9 @@ func ListMatrix(point image.Point) *list.List {
 
 func SearchList(list *list.List, subject interface{}) *list.Element {
     for elem := list.Front(); elem != nil; elem = elem.Next() {
+        if reflect.Typeof(elem.Value) != reflect.Typeof(subject) {
+            continue
+        }
         if elem.Value == subject {
             fmt.Println("Found")
             return elem
@@ -323,7 +327,7 @@ func Delete(drawable Drawable, out chan chan ColorPoint) {
 
 func RedrawList(list *list.List, out chan chan ColorPoint) {
     for elem := list.Front(); elem != nil; elem = elem.Next() {
-        drawable := *(elem.Value.(*Drawable))
+        drawable := elem.Value.(Drawable)
         out <- drawable.PointChan()
     }
 }
