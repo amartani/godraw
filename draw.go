@@ -70,7 +70,7 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
             continue
         }
 	if elem.Value.(Drawable).Id() == subject.(Drawable).Id() {
-            fmt.Println("Found")
+            fmt.Println("Found ", elem.Value.(Drawable).Id(), ":", subject.(Drawable).Id())
             return elem
         }
     }
@@ -153,7 +153,7 @@ func (line *Line) Id() int {
     return line.id
 }
 
-func (poligon Poligon) Id() int {
+func (poligon *Poligon) Id() int {
     return poligon.id
 }
 
@@ -161,7 +161,7 @@ func (line *Line) SetId(id int) {
     line.id = id
 }
 
-func (poligon Poligon) SetId(id int) {
+func (poligon *Poligon) SetId(id int) {
     poligon.id = id
 }
 
@@ -270,7 +270,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
                 p1 = p2
                 p2 = p
                 line := Line{p1, p2, currentColor, dottedLine, 0}
-                out <- RegisterPoints(line.PointChan(), poligon)
+                out <- RegisterPoints(line.PointChan(), &poligon)
             } else {
                 p2 = p
             }
@@ -284,11 +284,11 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     }
     if i > 0 {
         line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine, 0}
-        out <- RegisterPoints(line.PointChan(), poligon)
+        out <- RegisterPoints(line.PointChan(), &poligon)
     }
 }
 
-func (poligon Poligon) PointChan() chan ColorPoint {
+func (poligon *Poligon) PointChan() chan ColorPoint {
     outchan := make(chan ColorPoint)
     go func() {
         points := poligon.points.Iter()
