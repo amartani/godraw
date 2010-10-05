@@ -1,0 +1,21 @@
+2010-10-04:
+- RegisterPoints coloca pontos na matrix de associação
+- EventProcessor retorna um chan chan ColorPoint, ou seja, é um canal que,
+para cada figura, ele coloca no canal um chan ColorPoint com os pontos da
+figura. Eh a unica maneira q eu encontrei para o registro não ser feito na
+thread principal (pq o Delete precisa apagar, e não registrar)
+- Para imprimir os pontos, usar algo do tipo:
+out <- RegisterPoints(line.PointChan(), poligon)
+assim ele envia os pontos da linha pra fora mas registra o poligon
+- Achei um jeito mais facil de indicar o fim do canal do q enviar um ponto
+invalido. Pode dar um close(canal) e verificar com closed(canal)
+- Renomeei Delete para DeleteHandler
+- Delete funcionando, basta que os objetos retornem o LineChan certinho
+- Delete estava funcionando. Tentei fazer a RemoveFromMatrix, que retira
+as referencias dela. Já tentei pra caralho, mas não sei porque o negócio
+trava com poligono, mas vai bonitinho com retas. Pela mensagem de erro,
+acho que tem a ver com o fato do poligono ter um ponteiro no struct dele,
+enquanto que a Line não. Mas não sei mais o que fazer... De qualquer forma,
+com a reta tá funcionando, e se comentar a linha 321 (RemoveFromMatrix)
+também funciona com poligono, só que as figuras vao continuar existindo
+no mapa de bits.
