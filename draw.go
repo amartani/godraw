@@ -15,10 +15,12 @@ import (
 const (
     HMAX = 600
     WMAX = 800
-    SEARCH_RADIUS = 6
+    SEARCH_RADIUS = 10
 )
 
 var matrix =  new([WMAX][HMAX]list.List)
+
+/* Functions for the Matrix */
 
 func PushMatrix (point image.Point, draw Drawable) {
     matrix[point.X][point.Y].PushFront(draw)
@@ -41,18 +43,56 @@ func PopMatrix (point image.Point) Drawable {
     return nil
 }
 
+func RemoveFromMatrix(point image.Point, drawable interface{}) {
+    list := &matrix[point.X][point.Y]
+    elem := SearchList(list, drawable)
+    if (elem != nil) {
+        list.Remove(elem)
+    }
+}
+
+func ListMatrix(point image.Point) *list.List {
+    return &matrix[point.X][point.Y]
+}
+
+/* End funcions for the Matrix */
+
+/* Helper functions for list.List */
+
+func SearchList(list *list.List, subject interface{}) *list.Element {
+    for elem := list.Front(); elem != nil; elem = elem.Next() {
+        if elem.Value == subject {
+            fmt.Println("Found")
+            return elem
+        }
+    }
+    fmt.Println("Not found")
+    return nil
+}
+
+func MergeLists(list *list.List, list2 *list.List) {
+    for elem := list2.Front(); elem != nil; elem = elem.Next() {
+        if SearchList(list, elem.Value) == nil {
+            list.PushFront(elem.Value)
+        }
+    }
+}
+
+/* End helper funcions for list.List */
+
 func SearchNearPoint (point image.Point) Drawable {
     for radius := 0; radius < SEARCH_RADIUS; radius++ {
         for x := point.X - radius; x <= point.X + radius; x++ {
             for y := point.Y - radius; y <= point.Y + radius; y++ {
                 drawable := TopMatrix(image.Point{x, y})
                 if drawable != nil {
+                    fmt.Println("Objeto encontrado")
                     return drawable
                 }
             }
         }
     }
-    fmt.Println("Objeto nao encontrado");
+    fmt.Println("Objeto nao encontrado")
     return nil
 }
 
@@ -99,7 +139,7 @@ func (colorpoint ColorPoint) Valid() bool {
 
 // Draw line on the surface
 // Uses Bresenham's algorithm
-func (line Line) PointChan() chan ColorPoint {
+func (line *Line) PointChan() chan ColorPoint {
     pointchan := make(chan ColorPoint)
     go func() {
         start := line.start
@@ -225,7 +265,6 @@ func (poligon Poligon) PointChan() chan ColorPoint {
     go func() {
         points := poligon.points.Iter()
         first := (<-points).(image.Point)
-        fmt.Println("Passou :)");
         before := first
         var after image.Point
         for ! closed(points) {
@@ -270,14 +309,24 @@ func Delete(drawable Drawable, out chan chan ColorPoint) {
     blackpoints := make(chan ColorPoint)
     out <- blackpoints
     colorpoints := drawable.PointChan()
+    //redraw := new(list.List)
     for ! closed(colorpoints) {
         point := <-colorpoints
         point.color = image.RGBAColor{0, 0, 0, 0}
         blackpoints <- point
+        RemoveFromMatrix(point.point, drawable);
+        //MergeLists(redraw, ListMatrix(point.point))
+        //RedrawList(redraw, out)
     }
     close(blackpoints)
 }
 
+func RedrawList(list *list.List, out chan chan ColorPoint) {
+    for elem := list.Front(); elem != nil; elem = elem.Next() {
+        drawable := *(elem.Value.(*Drawable))
+        out <- drawable.PointChan()
+    }
+}
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar linha")
@@ -291,7 +340,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
         }
     }
     line := Line{pa[0], pa[1], currentColor, dottedLine}
-    out <- RegisterPoints(line.PointChan(), line)
+    out <- RegisterPoints(line.PointChan(), &line)
 }
 
 func SetColor (kbchan chan int) {

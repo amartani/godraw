@@ -9,3 +9,5 @@ out <- RegisterPoints(line.PointChan(), poligon)
 assim ele envia os pontos da linha pra fora mas registra o poligon
 - Achei um jeito mais facil de indicar o fim do canal do q enviar um ponto
 invalido. Pode dar um close(canal) e verificar com closed(canal)
+- Renomeei Delete para DeleteHandler
+- Delete funcionando, basta que os objetos retornem o LineChan certinho
