@@ -147,7 +147,6 @@ type Drawable interface {
     PointChan() chan ColorPoint
     Id() int
     SetId(int)
-    Color() image.RGBAColor
 }
 
 func (colorpoint ColorPoint) Valid() bool {
@@ -163,14 +162,6 @@ func (line *Line) Id() int {
 
 func (poligon *Poligon) Id() int {
     return poligon.id
-}
-
-func (line *Line) Color() image.RGBAColor {
-    return line.color
-}
-
-func (poligon *Poligon) Color() image.RGBAColor {
-    return poligon.color
 }
 
 func (line *Line) SetId(id int) {
