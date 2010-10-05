@@ -10,7 +10,7 @@ import (
     "image"
     "math"
     "container/list"
-    "reflect"
+    // "reflect"
 )
 
 const (
@@ -25,23 +25,31 @@ var matrix =  new([WMAX][HMAX]list.List)
 
 /* Functions for the Matrix */
 
-func PushMatrix (point image.Point, draw Drawable) {
-    matrix[point.X][point.Y].PushFront(draw)
+func PushMatrix (color_point ColorPoint) {
+    matrix[color_point.point.X][color_point.point.Y].PushFront(color_point)
 }
 
 func TopMatrix (point image.Point) Drawable {
     element := matrix[point.X][point.Y].Front()
     if element != nil {
-        return element.Value.(Drawable)
+        return *(element.Value.(ColorPoint).drawable)
     }
     return nil
+}
+
+func TopMatrixColorPoint (point image.Point) ColorPoint {
+    element := matrix[point.X][point.Y].Front()
+    if element != nil {
+        return element.Value.(ColorPoint)
+    }
+    return ColorPoint{point, image.RGBAColor{0, 0, 0, 255}, nil}
 }
 
 func PopMatrix (point image.Point) Drawable {
     element := matrix[point.X][point.Y].Front()
     if element != nil {
         matrix[point.X][point.Y].Remove(element)
-        return element.Value.(Drawable)
+        return *(element.Value.(ColorPoint).drawable)
     }
     return nil
 }
@@ -64,11 +72,11 @@ func ListMatrix(point image.Point) *list.List {
 
 func SearchList(list *list.List, subject interface{}) *list.Element {
     for elem := list.Front(); elem != nil; elem = elem.Next() {
-        if reflect.Typeof(elem.Value) != reflect.Typeof(subject) {
-            continue
-        }
-	if elem.Value.(Drawable).Id() == subject.(Drawable).Id() {
-            fmt.Println("Found ", elem.Value.(Drawable).Id(), ":", subject.(Drawable).Id())
+        // if reflect.Typeof(elem.Value) != reflect.Typeof(subject) {
+        //     continue
+        // }
+        if elem.Value.(ColorPoint).drawable.Id() == subject.(Drawable).Id() {
+            fmt.Println("Found ", elem.Value.(ColorPoint).drawable.Id(), ":", subject.(Drawable).Id())
             return elem
         }
     }
@@ -76,13 +84,13 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
     return nil
 }
 
-func MergeLists(list *list.List, list2 *list.List) {
-    for elem := list2.Front(); elem != nil; elem = elem.Next() {
-        if SearchList(list, elem.Value) == nil {
-            list.PushFront(elem.Value)
-        }
-    }
-}
+// func MergeLists(list *list.List, list2 *list.List) {
+//     for elem := list2.Front(); elem != nil; elem = elem.Next() {
+//         if SearchList(list, elem.Value) == nil {
+//             list.PushFront(elem.Value)
+//         }
+//     }
+// }
 
 /* End helper funcions for list.List */
 
@@ -128,6 +136,7 @@ type Poligon struct {
 type ColorPoint struct {
     point image.Point
     color image.RGBAColor
+    drawable *Drawable
 }
 
 func (a Line) length() float64 {
@@ -197,9 +206,9 @@ func (line *Line) PointChan() chan ColorPoint {
         }
         for x := start.X; x<end.X; x++ {
             if steep {
-                pointchan <- ColorPoint{image.Point{y, x}, line.color}
+                pointchan <- ColorPoint{image.Point{y, x}, line.color, nil}
             } else {
-                pointchan <- ColorPoint{image.Point{x, y}, line.color}
+                pointchan <- ColorPoint{image.Point{x, y}, line.color, nil}
             }
             error = error - deltay
             if error < 0 {
@@ -346,29 +355,23 @@ func Delete(drawable Drawable, out chan chan ColorPoint) {
     blackpoints := make(chan ColorPoint)
     out <- blackpoints
     colorpoints := drawable.PointChan()
-    //redraw := new(list.List)
     for ! closed(colorpoints) {
         point := <-colorpoints
         RemoveFromMatrix(point.point, drawable);
-        top_drawable := TopMatrix(point.point)
-        if top_drawable == nil {
-          point.color = image.RGBAColor{0, 0, 0, 255}
-          blackpoints <- point
-        } else {
-          blackpoints <- ColorPoint{point.point, top_drawable.Color()}
-        }
+        color_point := TopMatrixColorPoint(point.point)
+        blackpoints <- color_point
         //MergeLists(redraw, ListMatrix(point.point))
         //RedrawList(redraw, out)
     }
     close(blackpoints)
 }
 
-func RedrawList(list *list.List, out chan chan ColorPoint) {
-    for elem := list.Front(); elem != nil; elem = elem.Next() {
-        drawable := elem.Value.(Drawable)
-        out <- drawable.PointChan()
-    }
-}
+// func RedrawList(list *list.List, out chan chan ColorPoint) {
+//     for elem := list.Front(); elem != nil; elem = elem.Next() {
+//         drawable := elem.Value.(ColorPoint).drawable
+//         out <- drawable.PointChan()
+//     }
+// }
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar linha")
@@ -433,7 +436,8 @@ func RegisterPoints (pointchan chan ColorPoint, drawable Drawable) chan ColorPoi
     go func() {
         for ! closed(pointchan) {
             colorpoint := <-pointchan
-            PushMatrix(colorpoint.point, drawable)
+            colorpoint.drawable = &drawable
+            PushMatrix(colorpoint)
             outchan <- colorpoint
         }
         close (outchan)
