@@ -138,6 +138,7 @@ type Drawable interface {
     PointChan() chan ColorPoint
     Id() int
     SetId(int)
+    Color() image.RGBAColor
 }
 
 func (colorpoint ColorPoint) Valid() bool {
@@ -153,6 +154,14 @@ func (line *Line) Id() int {
 
 func (poligon *Poligon) Id() int {
     return poligon.id
+}
+
+func (line *Line) Color() image.RGBAColor {
+    return line.color
+}
+
+func (poligon *Poligon) Color() image.RGBAColor {
+    return poligon.color
 }
 
 func (line *Line) SetId(id int) {
@@ -340,9 +349,14 @@ func Delete(drawable Drawable, out chan chan ColorPoint) {
     //redraw := new(list.List)
     for ! closed(colorpoints) {
         point := <-colorpoints
-        point.color = image.RGBAColor{0, 0, 0, 0}
-        blackpoints <- point
         RemoveFromMatrix(point.point, drawable);
+        top_drawable := TopMatrix(point.point)
+        if top_drawable == nil {
+          point.color = image.RGBAColor{0, 0, 0, 255}
+          blackpoints <- point
+        } else {
+          blackpoints <- ColorPoint{point.point, top_drawable.Color()}
+        }
         //MergeLists(redraw, ListMatrix(point.point))
         //RedrawList(redraw, out)
     }
