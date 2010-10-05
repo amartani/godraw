@@ -94,20 +94,20 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
 
 /* End helper funcions for list.List */
 
-func SearchNearPoint (point image.Point) Drawable {
+func SearchNearPoint (point image.Point) (Drawable, image.Point) {
     for radius := 0; radius < SEARCH_RADIUS; radius++ {
         for x := point.X - radius; x <= point.X + radius; x++ {
             for y := point.Y - radius; y <= point.Y + radius; y++ {
                 drawable := TopMatrix(image.Point{x, y})
                 if drawable != nil {
                     fmt.Println("Objeto encontrado")
-                    return drawable
+                    return drawable, image.Point{x, y}
                 }
             }
         }
     }
     fmt.Println("Objeto nao encontrado")
-    return nil
+    return nil, point
 }
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
@@ -147,6 +147,7 @@ type Drawable interface {
     PointChan() chan ColorPoint
     Id() int
     SetId(int)
+    Move(image.Point)
 }
 
 func (colorpoint ColorPoint) Valid() bool {
@@ -212,6 +213,11 @@ func (line *Line) PointChan() chan ColorPoint {
     return pointchan
 }
 
+func (line *Line) Move (dest image.Point) {
+    line.start = line.start.Add(dest)
+    line.end   = line.end.Add(dest)
+}
+
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     out := make(chan image.Point)
     go func() {
@@ -250,6 +256,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     break
                 case 'p':
                     PoligonCreator(clickchan, kbchan, out)
+                case 'm':
+                    MoveHandler(clickchan, kbchan, out)
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -326,12 +334,20 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
     return outchan
 }
 
+func (poligon *Poligon) Move(point image.Point) {
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        point = point.Add(point)
+        elem.Value = point
+    }
+}
+
 func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Apagar objeto")
     for {
     select {
         case p := <-clickchan:
-            drawable := SearchNearPoint(p)
+            drawable, _ := SearchNearPoint(p)
             if drawable != nil {
                 go Delete(drawable, out)
                 return
@@ -398,6 +414,34 @@ func SetColor (kbchan chan int) {
     case 'w':
         currentColor = image.RGBAColor{255, 255, 255, 255}
         fmt.Println("Branco selecionado")
+    }
+}
+
+func MoveHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Mover objeto")
+    has_origin := false
+    var drawable Drawable
+    var origin image.Point
+    for {
+    select {
+        case p := <-clickchan:
+            if has_origin == false {
+                drawable, origin = SearchNearPoint(p)
+                if drawable != nil {
+                    has_origin = true
+                }
+            } else {
+                dest := p
+                moviment := dest.Sub(origin)
+                fmt.Println("Move (%d, %d)", moviment.X, moviment.Y)
+                Delete(drawable, out)
+                drawable.Move(moviment)
+                out <- RegisterPoints(drawable.PointChan(), drawable)
+                return
+            }
+        case <-kbchan:
+            return
+    }
     }
 }
 
