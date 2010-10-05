@@ -1,0 +1,11 @@
+2010-10-04:
+- RegisterPoints coloca pontos na matrix de associação
+- EventProcessor retorna um chan chan ColorPoint, ou seja, é um canal que,
+para cada figura, ele coloca no canal um chan ColorPoint com os pontos da
+figura. Eh a unica maneira q eu encontrei para o registro não ser feito na
+thread principal (pq o Delete precisa apagar, e não registrar)
+- Para imprimir os pontos, usar algo do tipo:
+out <- RegisterPoints(line.PointChan(), poligon)
+assim ele envia os pontos da linha pra fora mas registra o poligon
+- Achei um jeito mais facil de indicar o fim do canal do q enviar um ponto
+invalido. Pode dar um close(canal) e verificar com closed(canal)
