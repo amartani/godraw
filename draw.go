@@ -52,6 +52,7 @@ func SearchNearPoint (point image.Point) Drawable {
             }
         }
     }
+    fmt.Println("Objeto nao encontrado");
     return nil
 }
 
@@ -71,9 +72,14 @@ type Line struct {
 }
 
 type Poligon struct {
-    points list.List
+    points *list.List
     color image.RGBAColor
     dotted bool
+}
+
+type ColorPoint struct {
+    point image.Point
+    color image.RGBAColor
 }
 
 func (a Line) length() float64 {
@@ -81,45 +87,54 @@ func (a Line) length() float64 {
 }
 
 type Drawable interface {
-    Draw(draw.Image)
+    PointChan() chan ColorPoint
+}
+
+func (colorpoint ColorPoint) Valid() bool {
+    if colorpoint.point.X == -1 {
+        return false
+    }
+    return true
 }
 
 // Draw line on the surface
 // Uses Bresenham's algorithm
-func (line Line) Draw(surface draw.Image) {
-    fmt.Println("Line: (", line.start.X, ", ", line.start.Y, ") - (", line.end.X, ", ", line.end.Y, ")")
-    start := line.start
-    end := line.end
-    steep := abs(end.Y - start.Y) > abs(end.X - start.X)
-    if steep {
-        start.X, start.Y = start.Y, start.X
-        end.X, end.Y = end.Y, end.X
-    }
-    if start.X > end.X {
-        start, end = end, start
-    }
-    deltax := end.X - start.X
-    deltay := abs(end.Y - start.Y)
-    error := deltax/2
-    y := start.Y
-    ystep := 1
-    if start.Y > end.Y {
-        ystep = -1
-    }
-    for x := start.X; x<end.X; x++ {
+func (line Line) PointChan() chan ColorPoint {
+    pointchan := make(chan ColorPoint)
+    go func() {
+        start := line.start
+        end := line.end
+        steep := abs(end.Y - start.Y) > abs(end.X - start.X)
         if steep {
-            PushMatrix(image.Point{y, x}, line)
-            surface.Set(y, x, line.color)
-        } else {
-            PushMatrix(image.Point{x, y}, line)
-            surface.Set(x, y, line.color)
+            start.X, start.Y = start.Y, start.X
+            end.X, end.Y = end.Y, end.X
         }
-        error = error - deltay
-        if error < 0 {
-            y += ystep
-            error += deltax
+        if start.X > end.X {
+            start, end = end, start
         }
-    }
+        deltax := end.X - start.X
+        deltay := abs(end.Y - start.Y)
+        error := deltax/2
+        y := start.Y
+        ystep := 1
+        if start.Y > end.Y {
+            ystep = -1
+        }
+        for x := start.X; x<end.X; x++ {
+            if steep {
+                pointchan <- ColorPoint{image.Point{y, x}, line.color}
+            } else {
+                pointchan <- ColorPoint{image.Point{x, y}, line.color}
+            }
+            error = error - deltay
+            if error < 0 {
+                y += ystep
+                error += deltax
+            }
+        }
+        close(pointchan)
+    }()
+    return pointchan
 }
 
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
@@ -141,8 +156,8 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     return out
 }
 
-func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawable {
-    out := make(chan Drawable)
+func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan ColorPoint {
+    out := make(chan chan ColorPoint)
     go func() {
         for {
             select {
@@ -156,7 +171,7 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
                     SetColor(kbchan)
                     break
                 case 'd':
-                    Delete(clickchan, kbchan, out)
+                    DeleteHandler(clickchan, kbchan, out)
                     break
                 case 'p':
                     PoligonCreator(clickchan, kbchan, out)
@@ -170,23 +185,25 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan Drawabl
    return out
 }
 
-func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar Poligono")
     points := new(list.List)
     i := 0
     for_breaker := false
     var p1 image.Point
     var p2 image.Point
+    poligon := Poligon{points, currentColor, dottedLine}
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
             fmt.Println("Ponto para poligono")
-            points.PushFront(p)
+            points.PushBack(p)
             if i > 0 {
                 p1 = p2
                 p2 = p
-                out <- Line{p1, p2, currentColor, dottedLine}
-            }else{
+                line := Line{p1, p2, currentColor, dottedLine}
+                out <- RegisterPoints(line.PointChan(), poligon)
+            } else {
                 p2 = p
             }
         case <- kbchan:
@@ -198,21 +215,49 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- D
         }
     }
     if i > 0 {
-        out <- Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine}
-       // Poligon{points, currentColor, dottedLine}
+        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine}
+        out <- RegisterPoints(line.PointChan(), poligon)
     }
 }
 
-func Delete (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+func (poligon Poligon) PointChan() chan ColorPoint {
+    outchan := make(chan ColorPoint)
+    go func() {
+        points := poligon.points.Iter()
+        first := (<-points).(image.Point)
+        fmt.Println("Passou :)");
+        before := first
+        var after image.Point
+        for ! closed(points) {
+            aftertemp := <-points
+            if aftertemp == nil { break }
+            after = aftertemp.(image.Point)
+            line := Line{before, after, poligon.color, poligon.dotted}
+            linechan := line.PointChan()
+            for ! closed(linechan) {
+                outchan <- <- linechan
+            }
+            before = after
+        }
+        // Line to close poligon
+        line := Line{before, first, poligon.color, poligon.dotted}
+        linechan := line.PointChan()
+        for ! closed(linechan) {
+            outchan <- <- linechan
+        }
+        close(outchan)
+    }()
+    return outchan
+}
+
+func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Apagar objeto")
     for {
     select {
         case p := <-clickchan:
-            drawable := PopMatrix(p)
+            drawable := SearchNearPoint(p)
             if drawable != nil {
-                line := drawable.(Line)
-                line.color = image.RGBAColor{0, 0, 0, 0}
-                out <- line
+                go Delete(drawable, out)
                 return
             }
         case <-kbchan:
@@ -221,21 +266,32 @@ func Delete (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable)
     }
 }
 
+func Delete(drawable Drawable, out chan chan ColorPoint) {
+    blackpoints := make(chan ColorPoint)
+    out <- blackpoints
+    colorpoints := drawable.PointChan()
+    for ! closed(colorpoints) {
+        point := <-colorpoints
+        point.color = image.RGBAColor{0, 0, 0, 0}
+        blackpoints <- point
+    }
+    close(blackpoints)
+}
 
-func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Drawable) {
+
+func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar linha")
     pa := [2]image.Point{}
     for i:=0; i<2; i++ {
-        fmt.Println("Ponto inicial")
         select {
         case p := <-clickchan:
-            fmt.Println("clique para linha")
             pa[i] = p
         case <-kbchan:
             return
         }
     }
-    out <- Line{pa[0], pa[1], currentColor, dottedLine}
+    line := Line{pa[0], pa[1], currentColor, dottedLine}
+    out <- RegisterPoints(line.PointChan(), line)
 }
 
 func SetColor (kbchan chan int) {
@@ -272,17 +328,36 @@ func RWKBChan (kbchan <-chan int) chan int {
     return rwchan;
 }
 
+func Draw (surface draw.Image, pointchan chan ColorPoint) {
+    for ! closed(pointchan) {
+        colorpoint := <-pointchan
+        surface.Set(colorpoint.point.X, colorpoint.point.Y, colorpoint.color)
+    }
+}
+
+func RegisterPoints (pointchan chan ColorPoint, drawable Drawable) chan ColorPoint {
+    outchan := make(chan ColorPoint)
+    go func() {
+        for ! closed(pointchan) {
+            colorpoint := <-pointchan
+            PushMatrix(colorpoint.point, drawable)
+            outchan <- colorpoint
+        }
+        close (outchan)
+    }()
+    return outchan
+}
 
 func main() {
     context, _ := x11.NewWindow()
     context.FlushImage()
     kbchan := RWKBChan(context.KeyboardChan());
     clickchan := MouseHandler(context.MouseChan())
-    drawablechan := EventProcessor(clickchan, kbchan)
+    colorpointchanchan := EventProcessor(clickchan, kbchan)
     for {
         select {
-        case object := <-drawablechan:
-            object.Draw(context.Screen())
+        case colorpointchan := <-colorpointchanchan:
+            Draw(context.Screen(), colorpointchan)
             context.FlushImage()
         case <-context.QuitChan():
             fmt.Println("Quit")
