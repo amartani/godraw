@@ -26,8 +26,6 @@ var matrix =  new([WMAX][HMAX]list.List)
 /* Functions for the Matrix */
 
 func PushMatrix (point image.Point, draw Drawable) {
-    counter_id++
-    draw.SetId(counter_id)
     matrix[point.X][point.Y].PushFront(draw)
 }
 
@@ -286,6 +284,8 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
         line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine, 0}
         out <- RegisterPoints(line.PointChan(), &poligon)
     }
+    counter_id++
+    (&poligon).SetId(counter_id)
 }
 
 func (poligon *Poligon) PointChan() chan ColorPoint {
@@ -369,6 +369,8 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
     }
     line := Line{pa[0], pa[1], currentColor, dottedLine, 0}
     out <- RegisterPoints(line.PointChan(), &line)
+    counter_id++
+    (&line).SetId(counter_id)
 }
 
 func SetColor (kbchan chan int) {
