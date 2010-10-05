@@ -18,6 +18,8 @@ const (
     SEARCH_RADIUS = 6
 )
 
+var INVALID_COLORPOINT = ColorPoint{image.Point{-1, -1}, image.RGBAColor{0, 0, 0, 0}}
+
 var matrix =  new([WMAX][HMAX]list.List)
 
 func PushMatrix (point image.Point, draw Drawable) {
@@ -52,6 +54,7 @@ func SearchNearPoint (point image.Point) Drawable {
             }
         }
     }
+    fmt.Println("Objeto nao encontrado");
     return nil
 }
 
@@ -76,50 +79,65 @@ type Poligon struct {
     dotted bool
 }
 
+type ColorPoint struct {
+    point image.Point
+    color image.RGBAColor
+}
+
 func (a Line) length() float64 {
     return math.Sqrt(math.Pow(float64(a.start.X - a.end.X), 2) + math.Pow(float64(a.start.Y - a.end.Y), 2))
 }
 
 type Drawable interface {
-    Draw(draw.Image)
+    PointChan() chan ColorPoint
+}
+
+func (colorpoint ColorPoint) Valid() bool {
+    if colorpoint.point.X == -1 {
+        return false
+    }
+    return true
 }
 
 // Draw line on the surface
 // Uses Bresenham's algorithm
-func (line Line) Draw(surface draw.Image) {
-    fmt.Println("Line: (", line.start.X, ", ", line.start.Y, ") - (", line.end.X, ", ", line.end.Y, ")")
-    start := line.start
-    end := line.end
-    steep := abs(end.Y - start.Y) > abs(end.X - start.X)
-    if steep {
-        start.X, start.Y = start.Y, start.X
-        end.X, end.Y = end.Y, end.X
-    }
-    if start.X > end.X {
-        start, end = end, start
-    }
-    deltax := end.X - start.X
-    deltay := abs(end.Y - start.Y)
-    error := deltax/2
-    y := start.Y
-    ystep := 1
-    if start.Y > end.Y {
-        ystep = -1
-    }
-    for x := start.X; x<end.X; x++ {
+func (line Line) PointChan() chan ColorPoint {
+    pointchan := make(chan ColorPoint)
+    go func() {
+        start := line.start
+        end := line.end
+        steep := abs(end.Y - start.Y) > abs(end.X - start.X)
         if steep {
-            PushMatrix(image.Point{y, x}, line)
-            surface.Set(y, x, line.color)
-        } else {
-            PushMatrix(image.Point{x, y}, line)
-            surface.Set(x, y, line.color)
+            start.X, start.Y = start.Y, start.X
+            end.X, end.Y = end.Y, end.X
         }
-        error = error - deltay
-        if error < 0 {
-            y += ystep
-            error += deltax
+        if start.X > end.X {
+            start, end = end, start
         }
-    }
+        deltax := end.X - start.X
+        deltay := abs(end.Y - start.Y)
+        error := deltax/2
+        y := start.Y
+        ystep := 1
+        if start.Y > end.Y {
+            ystep = -1
+        }
+        for x := start.X; x<end.X; x++ {
+            if steep {
+                pointchan <- ColorPoint{image.Point{y, x}, line.color}
+            } else {
+                pointchan <- ColorPoint{image.Point{x, y}, line.color}
+            }
+            error = error - deltay
+            if error < 0 {
+                y += ystep
+                error += deltax
+            }
+        }
+        pointchan <- INVALID_COLORPOINT
+
+    }()
+    return pointchan
 }
 
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
@@ -220,10 +238,8 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan<- Draw
     fmt.Println("Desenhar linha")
     pa := [2]image.Point{}
     for i:=0; i<2; i++ {
-        fmt.Println("Ponto inicial")
         select {
         case p := <-clickchan:
-            fmt.Println("clique para linha")
             pa[i] = p
         case <-kbchan:
             return
@@ -266,6 +282,23 @@ func RWKBChan (kbchan <-chan int) chan int {
     return rwchan;
 }
 
+func Draw (surface draw.Image, pointchan chan ColorPoint) {
+    for colorpoint := <-pointchan; colorpoint.Valid(); colorpoint = <-pointchan {
+        surface.Set(colorpoint.point.X, colorpoint.point.Y, colorpoint.color)
+    }
+}
+
+func RegisterPoints (pointchan chan ColorPoint, drawable Drawable) chan ColorPoint {
+    outchan := make(chan ColorPoint)
+    go func() {
+        for colorpoint := <-pointchan; colorpoint.Valid(); colorpoint = <-pointchan {
+            PushMatrix(colorpoint.point, drawable)
+            outchan <- colorpoint
+        }
+        outchan <- INVALID_COLORPOINT
+    }()
+    return outchan
+}
 
 func main() {
     context, _ := x11.NewWindow()
@@ -276,7 +309,8 @@ func main() {
     for {
         select {
         case object := <-drawablechan:
-            object.Draw(context.Screen())
+            pointchan := RegisterPoints(object.PointChan(), object)
+            Draw(context.Screen(), pointchan)
             context.FlushImage()
         case <-context.QuitChan():
             fmt.Println("Quit")
