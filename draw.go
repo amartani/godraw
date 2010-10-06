@@ -16,6 +16,7 @@ const (
     HMAX = 600
     WMAX = 800
     SEARCH_RADIUS = 10
+    SIDE_RATIO = 0.4 // Ratio for circle sides per radius
 )
 
 var counter_id = 0
@@ -93,6 +94,14 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
 
 /* End helper funcions for list.List */
 
+/* Helper functions for image.Point */
+
+func PointsDistance(p1 image.Point, p2 image.Point) float64 {
+    return math.Sqrt(math.Pow(float64(p1.X - p2.X), 2) + math.Pow(float64(p1.Y - p2.Y), 2))
+}
+
+/* End helper functions for image.Point */
+
 func SearchNearPoint (point image.Point) (Drawable, image.Point) {
     for radius := 0; radius < SEARCH_RADIUS; radius++ {
         for x := point.X - radius; x <= point.X + radius; x++ {
@@ -150,14 +159,33 @@ type RegularPoligon struct {
     Id
 }
 
+/* Circle definition */
+
+type Circle struct {
+    center  image.Point
+    start   image.Point
+    Id
+}
+
+/* Circle methods */
+
+func (circle *Circle) PointChan() chan ColorPoint {
+    radius := PointsDistance(circle.start, circle.center)
+    sides := int(SIDE_RATIO * radius)
+    fmt.Println("DEBUG: Circle sides: %d", sides)
+    regpol := RegularPoligon{circle.center, circle.start, sides, Id{0}}
+    return regpol.PointChan()
+}
+
+func (circle *Circle) Move(delta image.Point) {
+    circle.center   = circle.center.Add(delta)
+    circle.start    = circle.start.Add(delta)
+}
+
 type ColorPoint struct {
     point image.Point
     color image.RGBAColor
     drawable *Drawable
-}
-
-func (a Line) length() float64 {
-    return math.Sqrt(math.Pow(float64(a.start.X - a.end.X), 2) + math.Pow(float64(a.start.Y - a.end.Y), 2))
 }
 
 type Drawable interface {
@@ -319,6 +347,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     PoligonCreator(clickchan, kbchan, out)
                 case 'r':
                     RegularPoligonCreator(clickchan, kbchan, out, currentCounter)
+                case 'o':
+                    CircleCreator(clickchan, kbchan, out)
                 case '+':
                     currentCounter++
                     fmt.Println("Contador Generico: ", currentCounter)
@@ -369,6 +399,28 @@ func ThickHandler() {
     }
 }
 
+func CircleCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Desenhar Circulo")
+    points := [2]image.Point{}
+    for_breaker := false
+    for i := 0; i < 2; i++ {
+        select {
+        case p := <-clickchan:
+            fmt.Println("Ponto para circulo")
+            points[i] = p
+        case <-kbchan:
+            for_breaker = true
+            break
+        }
+        if for_breaker {
+            break
+        }
+    }
+    counter_id++
+    circle := Circle{points[0], points[1], Id{counter_id}}
+    out <- RegisterPoints(FilterInvalidPoints(circle.PointChan()), &circle)
+}
+
 func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint, sides int) {
     if sides < 3 {
         fmt.Println("Numero de lados invalido, lados:", sides)
@@ -409,7 +461,7 @@ func (regpol *RegularPoligon) PointChan() chan ColorPoint {
     for i := 0; i < sides; i++ {
         p := origin.Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
         poli_points.PushBack(p)
-        fmt.Println("Ponto: ", p)
+//        fmt.Println("Ponto: ", p)
     }
     poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{0}}
     return poligon.PointChan()
