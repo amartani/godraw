@@ -35,7 +35,7 @@ var currentDashStyle = 0
 var currentThick     = false
 
 var windowactive = false
-var windowpair = WindowPair{}
+var currentwindow = Window{}
 
 /* Functions for the Matrix */
 
@@ -154,6 +154,8 @@ func abs(n int) int {
 type Window struct {
     first   image.Point
     last    image.Point
+    target  image.Point
+    zoom    int
 }
 
 func (window Window) PointIn(point image.Point) bool {
@@ -164,21 +166,30 @@ func (window Window) PointIn(point image.Point) bool {
     return true
 }
 
-func (window Window) RelativePosition(point image.Point) image.Point {
-    return point.Sub(window.first)
+func (window Window) Size() (int, int) {
+    return window.last.X - window.first.X,
+           window.last.Y - window.first.Y
 }
 
-func (window Window) AbsolutePosition(point image.Point) image.Point {
-    return point.Add(window.first)
+func (window Window) TargetSize() (int, int) {
+    x, y := window.Size()
+    return x*window.zoom, y*window.zoom
 }
 
-type WindowPair struct {
-    from    Window
-    to      Window
+func (window Window) PointInTarget(point image.Point) bool {
+    sx, sy := window.TargetSize()
+    if point.X < window.target.X { return false }
+    if point.Y < window.target.Y { return false }
+    if point.X > window.target.X + sx { return false }
+    if point.Y > window.target.Y + sy { return false }
+    return true
 }
 
-func TransferPoint (fromwindow Window, towindow Window, point image.Point) image.Point {
-    return towindow.AbsolutePosition(fromwindow.RelativePosition(point))
+func (window Window) TransferPoint (point image.Point) image.Point {
+    zoom := window.zoom
+    relpoint := point.Sub(window.first)
+    zoompoint := image.Point{relpoint.X * zoom, relpoint.Y * zoom}
+    return zoompoint.Add(window.target)
 }
 
 type ColorPoint struct {
@@ -657,26 +668,30 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
 
 func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
-        wfilter := WindowFilter(WindowPair{Window{image.Point{10, 300}, image.Point{110, 400}},Window{image.Point{100, 200}, image.Point{200, 300}}})
+        wfilter := WindowFilter(Window{image.Point{10, 300}, image.Point{110, 400}, image.Point{300,10}, 4})
         return wfilter(FilterInvalidPoints(in))
     }
 }
 
-func WindowFilter(pair WindowPair) (func (chan ColorPoint) chan ColorPoint) {
-    fromwindow, towindow := pair.from, pair.to
+func WindowFilter(window Window) (func (chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
         out := make(chan ColorPoint)
         go func() {
             for ! closed(in) {
                 // Filter things behind towindow
                 cp := <-in
-                if towindow.PointIn(cp.point) {
+                if window.PointInTarget(cp.point) {
                     continue
                 }
                 // If in window, copy to towindow
-                if fromwindow.PointIn(cp.point) {
-                    newpoint := TransferPoint(fromwindow, towindow, cp.point)
-                    out <- ColorPoint{newpoint, cp.color, cp.drawable}
+                if window.PointIn(cp.point) {
+                    newpoint := window.TransferPoint(cp.point)
+                    for x:=0; x<window.zoom; x++ {
+                        for y:=0; y<window.zoom; y++ {
+                            delta := image.Point{x, y}
+                            out <- ColorPoint{newpoint.Add(delta), cp.color, cp.drawable}
+                        }
+                    }
                 }
                 out <- cp
             }
