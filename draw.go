@@ -185,13 +185,21 @@ func (w *Id) SetId(id int) {
     w.id = id
 }
 
+type FigProps struct {
+    color image.RGBAColor
+    dotted int
+    thick bool
+}
+
+func CurrentFigProps() FigProps {
+    return FigProps{currentColor, currentDashStyle, currentThick}
+}
+
 // Line
 type Line struct {
     start image.Point
     end image.Point
-    color image.RGBAColor
-    dotted int
-    thick bool
+    FigProps
     Id
 }
 
@@ -229,27 +237,27 @@ func (line *Line) PointChan() chan ColorPoint {
         for x := start.X; x<end.X; x++ {
             progress := x - start.X
             showpoint := true
-            if line.dotted == DOTTED {
+            if line.FigProps.dotted == DOTTED {
                 if progress % 4 >= 2 {
                     showpoint = false
                 }
             }
-            if line.dotted == DASHED {
+            if line.FigProps.dotted == DASHED {
                 if (progress * segments) % (2 * deltax) > 10 * segments {
                     showpoint = false
                 }
             }
             if showpoint {
                 if steep {
-                    if line.thick {
-                        pointchan <- ColorPoint{image.Point{y+1, x}, line.color, nil}
+                    if line.FigProps.thick {
+                        pointchan <- ColorPoint{image.Point{y+1, x}, line.FigProps.color, nil}
                     }
-                    pointchan <- ColorPoint{image.Point{y, x}, line.color, nil}
+                    pointchan <-ColorPoint{image.Point{y, x}, line.FigProps.color, nil}
                 } else {
-                    if line.thick {
-                        pointchan <- ColorPoint{image.Point{x, y+1}, line.color, nil}
+                    if line.FigProps.thick {
+                        pointchan <-ColorPoint{image.Point{x, y+1}, line.FigProps.color, nil}
                     }
-                    pointchan <- ColorPoint{image.Point{x, y}, line.color, nil}
+                    pointchan <-ColorPoint{image.Point{x, y}, line.FigProps.color, nil}
                 }
             }
             error = error - deltay
@@ -271,9 +279,7 @@ func (line *Line) Move (dest image.Point) {
 // Poligon
 type Poligon struct {
     points *list.List
-    color image.RGBAColor
-    dotted int
-    thick bool
+    FigProps
     Id
 }
 
@@ -295,7 +301,7 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
             aftertemp := <-points
             if aftertemp == nil { break }
             after = aftertemp.(image.Point)
-            line := Line{before, after, poligon.color, poligon.dotted, poligon.thick, Id{0}}
+            line := Line{before, after, poligon.FigProps, Id{0}}
             linechan := line.PointChan()
             for ! closed(linechan) {
                 outchan <- <- linechan
@@ -303,7 +309,7 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
             before = after
         }
         // Line to close poligon
-        line := Line{before, first, poligon.color, poligon.dotted, poligon.thick, Id{0}}
+        line := Line{before, first, poligon.FigProps, Id{0}}
         linechan := line.PointChan()
         for ! closed(linechan) {
             outchan <- <- linechan
@@ -326,6 +332,7 @@ type RegularPoligon struct {
     origin  image.Point
     start   image.Point
     sides   int
+    FigProps
     Id
 }
 
@@ -355,7 +362,7 @@ func (regpol *RegularPoligon) PointChan() chan ColorPoint {
         poli_points.PushBack(p)
 //        fmt.Println("Ponto: ", p)
     }
-    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{0}}
+    poligon := Poligon{poli_points, regpol.FigProps, Id{0}}
     return poligon.PointChan()
 }
 
@@ -363,6 +370,7 @@ func (regpol *RegularPoligon) PointChan() chan ColorPoint {
 type Circle struct {
     center  image.Point
     start   image.Point
+    FigProps
     Id
 }
 
@@ -370,7 +378,7 @@ func (circle *Circle) PointChan() chan ColorPoint {
     radius := PointsDistance(circle.start, circle.center)
     sides := int(SIDE_RATIO * radius)
     fmt.Println("DEBUG: Circle sides: %d", sides)
-    regpol := RegularPoligon{circle.center, circle.start, sides, Id{0}}
+    regpol := RegularPoligon{circle.center, circle.start, sides, circle.FigProps, Id{0}}
     return regpol.PointChan()
 }
 
@@ -384,6 +392,34 @@ func (circle *Circle) RotatePoints(origin image.Point, angle float64){
     circle.start  = RotatePoint(circle.start, origin, angle)
 }
 
+// CircleArc
+type CircleArc struct {
+    center  image.Point
+    start   image.Point
+    angle   float64
+    FigProps
+    Id
+}
+
+func (ca *CircleArc) PointChan() chan ColorPoint {
+//    endpoint := RotatePoint(ca.center, ca.start, ca.angle)
+    circle := Circle{ca.center, ca.start, ca.FigProps, Id{0}}
+    radius := PointsDistance(circle.start, circle.center)
+    sides := int(SIDE_RATIO * radius)
+    fmt.Println("DEBUG: Circle sides: %d", sides)
+    regpol := RegularPoligon{circle.center, circle.start, sides, ca.FigProps, Id{0}}
+    return regpol.PointChan()
+}
+
+func (circle *CircleArc) Move(delta image.Point) {
+    circle.center   = circle.center.Add(delta)
+    circle.start    = circle.start.Add(delta)
+}
+
+func (circle *CircleArc) RotatePoints(origin image.Point, angle float64){
+    circle.center = RotatePoint(circle.center, origin, angle)
+    circle.start  = RotatePoint(circle.start, origin, angle)
+}
 
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     out := make(chan image.Point)
@@ -507,7 +543,7 @@ func CircleCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan
         }
     }
     counter_id++
-    circle := Circle{points[0], points[1], Id{counter_id}}
+    circle := Circle{points[0], points[1], CurrentFigProps(), Id{counter_id}}
     out <- RegisterPoints(FilterInvalidPoints(circle.PointChan()), &circle)
 }
 
@@ -533,7 +569,7 @@ func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out c
         }
     }
     counter_id++
-    regpol := RegularPoligon{points[0], points[1], sides, Id{counter_id}}
+    regpol := RegularPoligon{points[0], points[1], sides, CurrentFigProps(), Id{counter_id}}
     out <- RegisterPoints(FilterInvalidPoints(regpol.PointChan()), &regpol)
 }
 
@@ -544,7 +580,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     for_breaker := false
     var p1 image.Point
     var p2 image.Point
-    poligon := Poligon{points, currentColor, currentDashStyle, currentThick, Id{0}}
+    poligon := Poligon{points, CurrentFigProps(), Id{0}}
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
@@ -553,7 +589,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
             if i > 0 {
                 p1 = p2
                 p2 = p
-                line := Line{p1, p2, currentColor, currentDashStyle, currentThick, Id{0}}
+                line := Line{p1, p2, CurrentFigProps(), Id{0}}
                 out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
             } else {
                 p2 = p
@@ -567,7 +603,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
         }
     }
     if i > 0 {
-        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, currentDashStyle, currentThick, Id{0}}
+        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), CurrentFigProps(), Id{0}}
         out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
     }
     counter_id++
@@ -654,7 +690,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
             return
         }
     }
-    line := Line{pa[0], pa[1], currentColor, currentDashStyle, currentThick, Id{0}}
+    line := Line{pa[0], pa[1], CurrentFigProps(), Id{0}}
     out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &line)
     counter_id++
     (&line).SetId(counter_id)
