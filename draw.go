@@ -125,6 +125,12 @@ func Angle (origin image.Point, point1 image.Point, point2 image.Point) float64 
     return ang2-ang1
 }
 
+func Theta(vector image.Point) float64{
+    ang := math.Atan(float64(int(vector.Y))/float64(int(vector.X)))
+    if vector.X < 0 { ang -= math.Pi }
+    return ang
+}
+
 func RotatePoint(point image.Point, origin image.Point, angle float64) image.Point {
     delta := point.Sub(origin)
     x := float64(int(delta.X))*math.Cos(angle) - float64(int(delta.Y))*math.Sin(angle)
@@ -171,6 +177,9 @@ type Drawable interface {
     SetId(int)
     Move(image.Point)
     RotatePoints(image.Point, float64)
+    Clone() Drawable
+    MirrorX()
+    MirrorY()
 }
 
 type Id struct {
@@ -193,6 +202,21 @@ type Line struct {
     dotted int
     thick bool
     Id
+}
+
+func (line *Line) Clone() Drawable {
+    counter_id++
+    return &Line{line.start, line.end, line.color, line.dotted, line.thick, Id{counter_id}}
+}
+
+func (line *Line) MirrorX() {
+    line.start.X = -line.start.X
+    line.end.X   = -line.end.X
+}
+
+func (line *Line) MirrorY() {
+    line.start.Y = -line.start.Y
+    line.end.Y   = -line.end.Y
 }
 
 func (line *Line) RotatePoints(origin image.Point, angle float64){
@@ -277,6 +301,35 @@ type Poligon struct {
     Id
 }
 
+func (poligon *Poligon) MirrorX() {
+    point_list := new(list.List)
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        point.X = -point.X
+        point_list.PushFront(point)
+    }
+}
+
+func (poligon *Poligon) MirrorY() {
+    point_list := new(list.List)
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        point.X = -point.Y
+        point_list.PushFront(point)
+    }
+}
+
+func (poligon *Poligon) Clone() Drawable {
+    point_list := new(list.List)
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        point.Y = -point.Y
+        point_list.PushFront(point)
+    }
+    counter_id++
+    return &Poligon{point_list, poligon.color, poligon.dotted, poligon.thick, Id{counter_id}}
+}
+
 func (poligon *Poligon) RotatePoints(origin image.Point, angle float64){
     for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
         point := elem.Value.(image.Point)
@@ -329,6 +382,21 @@ type RegularPoligon struct {
     Id
 }
 
+func (reg *RegularPoligon) MirrorX() {
+    reg.start.X  = -reg.start.X
+    reg.origin.X = -reg.origin.X
+}
+
+func (reg *RegularPoligon) MirrorY() {
+    reg.start.Y  = -reg.start.Y
+    reg.origin.Y = -reg.origin.Y
+}
+
+func (reg *RegularPoligon) Clone() Drawable {
+    counter_id++
+    return &RegularPoligon{reg.origin, reg.start, reg.sides, Id{counter_id}}
+}
+
 func (regpol *RegularPoligon) Move(delta image.Point) {
     regpol.origin = regpol.origin.Add(delta)
     regpol.start  = regpol.start .Add(delta)
@@ -366,6 +434,21 @@ type Circle struct {
     Id
 }
 
+func (circle  *Circle) MirrorX() {
+    circle.start.X  = -circle.start.X
+    circle.center.X = -circle.center.X
+}
+
+func (circle  *Circle) MirrorY() {
+    circle.start.Y  = -circle.start.Y
+    circle.center.Y = -circle.center.Y
+}
+
+func (circle *Circle) Clone() Drawable {
+    counter_id++
+    return &Circle{circle.center, circle.start, Id{counter_id}}
+}
+
 func (circle *Circle) PointChan() chan ColorPoint {
     radius := PointsDistance(circle.start, circle.center)
     sides := int(SIDE_RATIO * radius)
@@ -394,8 +477,7 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
             if clicked == false && mouse.Buttons & 1<<0 == 1<<0 { // botao esquerdo
                 clicked = true
                 fmt.Println("Click: ", mouse.X, ", ", mouse.Y)
-                out <- mouse.Point
-            }
+                out <- mouse.Point}
             if clicked == true && mouse.Buttons & 1<<0 == 0 {
                 clicked = false
             }
@@ -456,6 +538,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     ThickHandler()
                 case 'g':
                     RotateHandler(clickchan, kbchan, out)
+                case 'z':
+                    MirrorHandler(clickchan, kbchan, out)
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -612,6 +696,64 @@ func RotateHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
     Delete(drawable, out)
     drawable.RotatePoints(origin, Angle(origin, point1, point2))
     out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
+}
+
+func MirrorHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Espelhar objeto")
+    state := 0
+    var drawable Drawable
+    var point1 image.Point
+    var point2 image.Point
+    for {
+        select{
+        case p := <-clickchan:
+            switch(state){
+            case 0:
+                drawable, _ = SearchNearPoint(p)
+                if drawable != nil { state = 1 }
+                break
+            case 1:
+                point1 = p
+                fmt.Println("Ponto 1:", point1)
+                state = 2
+                break
+            case 2:
+                point2 = p
+                fmt.Println("Ponto 2:", point2)
+                state = 3
+            }
+        case <-kbchan:
+            return
+        }
+        if state == 3 { break }
+    }
+    mirrored := Mirror(point1, point2, drawable)
+    out <- RegisterPoints(FilterInvalidPoints(mirrored.PointChan()), mirrored)
+}
+
+func Mirror(p1 image.Point, p2 image.Point, drawable Drawable) Drawable{
+    ang := Theta(p2.Sub(p1))
+    x1 := float64(int(p1.X))
+    y1 := float64(int(p1.Y))
+    x2 := float64(int(p2.X))
+    y2 := float64(int(p2.Y))
+    var mirrored Drawable
+    if math.Fabs(ang) < math.Pi/float64(int(4)) {
+        origin := image.Point{0, int(float64(y1-x1*(y2-y1)/(x2-x1)))}
+        ang = math.Pi/float64(int(4))-ang
+        mirrored = drawable.Clone()
+        mirrored.RotatePoints(origin, ang)
+        mirrored.MirrorX()
+        mirrored.RotatePoints(origin, -ang)
+    } else {
+        origin := image.Point{int(float64((y1*x2-y2*x1)/(y1-y2))), 0}
+        ang = -ang
+        mirrored = drawable.Clone()
+        mirrored.RotatePoints(origin, ang)
+        mirrored.MirrorY()
+        mirrored.RotatePoints(origin, -ang)
+    }
+    return mirrored
 }
 
 func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
