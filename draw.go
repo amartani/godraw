@@ -437,8 +437,19 @@ type Grouping struct {
     Id
 }
 
+func (group *Grouping) DeleteOriginals(out chan chan ColorPoint) {
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        Delete(elem.Value.(Drawable), out)
+    }
+}
+
 func (group *Grouping) Clone() Drawable {
-    return group
+    draws_list := new(list.List)
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        draws_list.PushBack(elem.Value.(Drawable))
+    }
+    counter_id++
+    return &Grouping{draws_list, Id{counter_id}}
 }
 
 func (group *Grouping) PointChan() chan ColorPoint {
@@ -672,7 +683,9 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
 }
 
 func GroupingHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Agrupando objetos")
     draws := new(list.List)
+    for_breaker := false
     for {
         select{
         case p := <-clickchan:
@@ -681,11 +694,13 @@ func GroupingHandler (clickchan <-chan image.Point, kbchan chan int, out chan ch
                 draws.PushBack(drawable)
             }
         case <-kbchan:
-            return
+           for_breaker = true
         }
+        if for_breaker { break }
     }
     counter_id++
     group := Grouping{draws, Id{counter_id}}
+    group.DeleteOriginals(out)
     out <- RegisterPoints(FilterInvalidPoints(group.PointChan()), &group)
 }
 
@@ -935,6 +950,7 @@ func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
 }
 
 func Delete(drawable Drawable, out chan chan ColorPoint) {
+    fmt.Println("Deletado")
     blackpoints := make(chan ColorPoint)
     out <- blackpoints
     colorpoints := FilterInvalidPoints(drawable.PointChan())
