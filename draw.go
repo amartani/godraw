@@ -111,7 +111,14 @@ func SearchNearPoint (point image.Point) (Drawable, image.Point) {
 }
 
 var currentColor = image.RGBAColor{255, 255, 255, 255}
-var dottedLine   = true
+var dashStyle    = 0
+
+const (
+    SOLID = 0
+    DOTTED = 1
+    DASHED = 2
+)
+
 
 func abs(n int) int {
     if n>0 { return n }
@@ -122,14 +129,14 @@ type Line struct {
     start image.Point
     end image.Point
     color image.RGBAColor
-    dotted bool
+    dotted int
     id int
 }
 
 type Poligon struct {
     points *list.List
     color image.RGBAColor
-    dotted bool
+    dotted int
     id int
 }
 
@@ -197,6 +204,12 @@ func (line *Line) PointChan() chan ColorPoint {
             ystep = -1
         }
         for x := start.X; x<end.X; x++ {
+            progress := x - start.X
+            if line.dotted == DOTTED {
+                if progress % 4 >= 2 {
+                    continue
+                }
+            }
             if steep {
                 pointchan <- ColorPoint{image.Point{y, x}, line.color, nil}
             } else {
@@ -258,6 +271,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     PoligonCreator(clickchan, kbchan, out)
                 case 'm':
                     MoveHandler(clickchan, kbchan, out)
+                case 't':
+                    DashHandler()
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -268,6 +283,19 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
    return out
 }
 
+func DashHandler() {
+    dashStyle ++
+    dashStyle %= 3
+    switch dashStyle {
+    case SOLID:
+        fmt.Println("Style: solid")
+    case DOTTED:
+        fmt.Println("Style: dotted")
+    case DASHED:
+        fmt.Println("Style: dashed")
+    }
+}
+
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar Poligono")
     points := new(list.List)
@@ -275,7 +303,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     for_breaker := false
     var p1 image.Point
     var p2 image.Point
-    poligon := Poligon{points, currentColor, dottedLine, 0}
+    poligon := Poligon{points, currentColor, dashStyle, 0}
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
@@ -284,7 +312,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
             if i > 0 {
                 p1 = p2
                 p2 = p
-                line := Line{p1, p2, currentColor, dottedLine, 0}
+                line := Line{p1, p2, currentColor, dashStyle, 0}
                 out <- RegisterPoints(line.PointChan(), &poligon)
             } else {
                 p2 = p
@@ -298,7 +326,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
         }
     }
     if i > 0 {
-        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dottedLine, 0}
+        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dashStyle, 0}
         out <- RegisterPoints(line.PointChan(), &poligon)
     }
     counter_id++
@@ -391,7 +419,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
             return
         }
     }
-    line := Line{pa[0], pa[1], currentColor, dottedLine, 0}
+    line := Line{pa[0], pa[1], currentColor, dashStyle, 0}
     out <- RegisterPoints(line.PointChan(), &line)
     counter_id++
     (&line).SetId(counter_id)
