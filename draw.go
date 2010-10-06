@@ -76,7 +76,7 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
         //     continue
         // }
         if elem.Value.(ColorPoint).drawable.Id() == subject.(Drawable).Id() {
-            fmt.Println("Found ", elem.Value.(ColorPoint).drawable.Id(), ":", subject.(Drawable).Id())
+        //    fmt.Println("Found ", elem.Value.(ColorPoint).drawable.Id(), ":", subject.(Drawable).Id())
             return elem
         }
     }
