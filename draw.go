@@ -182,6 +182,11 @@ func (circle *Circle) Move(delta image.Point) {
     circle.start    = circle.start.Add(delta)
 }
 
+func (circle *Circle) RotatePoints(origin image.Point, angle float64){
+    circle.center = RotatePoint(circle.center, origin, angle)
+    circle.start  = RotatePoint(circle.start, origin, angle)
+}
+
 type ColorPoint struct {
     point image.Point
     color image.RGBAColor
