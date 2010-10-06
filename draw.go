@@ -34,6 +34,9 @@ var currentColor     = image.RGBAColor{255, 255, 255, 255}
 var currentDashStyle = 0
 var currentThick     = false
 
+var windowactive = false
+var windowpair = WindowPair{}
+
 /* Functions for the Matrix */
 
 func PushMatrix (color_point ColorPoint) {
@@ -147,6 +150,36 @@ func abs(n int) int {
 }
 
 /* Definitions */
+
+type Window struct {
+    first   image.Point
+    last    image.Point
+}
+
+func (window Window) PointIn(point image.Point) bool {
+    if point.X < window.first.X { return false }
+    if point.Y < window.first.Y { return false }
+    if point.X > window.last .X { return false }
+    if point.Y > window.last .Y { return false }
+    return true
+}
+
+func (window Window) RelativePosition(point image.Point) image.Point {
+    return point.Sub(window.first)
+}
+
+func (window Window) AbsolutePosition(point image.Point) image.Point {
+    return point.Add(window.first)
+}
+
+type WindowPair struct {
+    from    Window
+    to      Window
+}
+
+func TransferPoint (fromwindow Window, towindow Window, point image.Point) image.Point {
+    return towindow.AbsolutePosition(fromwindow.RelativePosition(point))
+}
 
 type ColorPoint struct {
     point image.Point
@@ -604,7 +637,34 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
 }
 
 func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
-    return func(in chan ColorPoint) chan ColorPoint { return FilterInvalidPoints(in) }
+    return func(in chan ColorPoint) chan ColorPoint {
+        wfilter := WindowFilter(WindowPair{Window{image.Point{10, 300}, image.Point{110, 400}},Window{image.Point{100, 200}, image.Point{200, 300}}})
+        return wfilter(FilterInvalidPoints(in))
+    }
+}
+
+func WindowFilter(pair WindowPair) (func (chan ColorPoint) chan ColorPoint) {
+    fromwindow, towindow := pair.from, pair.to
+    return func(in chan ColorPoint) chan ColorPoint {
+        out := make(chan ColorPoint)
+        go func() {
+            for ! closed(in) {
+                // Filter things behind towindow
+                cp := <-in
+                if towindow.PointIn(cp.point) {
+                    continue
+                }
+                // If in window, copy to towindow
+                if fromwindow.PointIn(cp.point) {
+                    newpoint := TransferPoint(fromwindow, towindow, cp.point)
+                    out <- ColorPoint{newpoint, cp.color, cp.drawable}
+                }
+                out <- cp
+            }
+            close(out)
+        }()
+        return out
+    }
 }
 
 func FilterInvalidPoints(in chan ColorPoint) (out chan ColorPoint) {
