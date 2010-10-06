@@ -328,6 +328,11 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     DashHandler()
                 case 'b':
                     ThickHandler()
+                case 'x':
+                    origin := image.Point{10, 10}
+                    point := image.Point{20, 10}
+                    angle := math.Pi/float64(int(2))
+                    fmt.Println("Origem:", origin, " Ponto:", point, " Angulo:", angle*180/math.Pi, " Rotacionado:", RotatePoint(point, origin, angle))
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -434,6 +439,13 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     }
     counter_id++
     (&poligon).SetId(counter_id)
+}
+
+func RotatePoint(point image.Point, origin image.Point, angle float64) image.Point {
+    delta := point.Sub(origin)
+    x := float64(int(delta.X))*math.Cos(angle) - float64(int(delta.Y))*math.Sin(angle)
+    y := float64(int(delta.X))*math.Sin(angle) + float64(int(delta.Y))*math.Cos(angle)
+    return image.Point{int(float64(x)), int(float64(y))}.Add(origin)
 }
 
 func (poligon *Poligon) PointChan() chan ColorPoint {
