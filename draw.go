@@ -203,11 +203,19 @@ func (line *Line) PointChan() chan ColorPoint {
         if start.Y > end.Y {
             ystep = -1
         }
+        // For dashed line
+        segments := deltax/10
+        if segments % 2 == 0 { segments++ }
         for x := start.X; x<end.X; x++ {
             progress := x - start.X
             showpoint := true
             if line.dotted == DOTTED {
                 if progress % 4 >= 2 {
+                    showpoint = false
+                }
+            }
+            if line.dotted == DASHED {
+                if (progress * segments) % (2 * deltax) > 10 * segments {
                     showpoint = false
                 }
             }
