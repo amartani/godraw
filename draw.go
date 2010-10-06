@@ -119,19 +119,19 @@ func PointsDistance(p1 image.Point, p2 image.Point) float64 {
 }
 
 func Angle (origin image.Point, point1 image.Point, point2 image.Point) float64 {
-    radius1 := point1.Sub(origin)
-    ang1    := math.Atan(float64(int(radius1.Y))/float64(int(radius1.X)))
-    if radius1.X < 0 { ang1 -= math.Pi }
-    radius2 := point2.Sub(origin)
-    ang2    := math.Atan(float64(int(radius2.Y))/float64(int(radius2.X)))
-    if radius2.X < 0 { ang2 -= math.Pi }
-    return ang2-ang1
+    // radius1 := point1.Sub(origin)
+    // ang1    := math.Atan(float64(int(radius1.Y))/float64(int(radius1.X)))
+    // if radius1.X < 0 { ang1 -= math.Pi }
+    // radius2 := point2.Sub(origin)
+    // ang2    := math.Atan(float64(int(radius2.Y))/float64(int(radius2.X)))
+    // if radius2.X < 0 { ang2 -= math.Pi }
+    return Theta(point2.Sub(origin))-Theta(point1.Sub(origin))
 }
 
 func Theta(vector image.Point) float64{
-    ang := math.Atan(float64(int(vector.Y))/float64(int(vector.X)))
-    if vector.X < 0 { ang -= math.Pi }
-    return ang
+    // ang := math.Atan(float64(int(vector.Y))/float64(int(vector.X)))
+    // if vector.X < 0 { ang -= math.Pi }
+    return math.Atan2(float64(int(vector.Y)), float64(int(vector.X)))
 }
 
 func RotatePoint(point image.Point, origin image.Point, angle float64) image.Point {
@@ -600,7 +600,7 @@ func (ca *CircleArc) PointChan() chan ColorPoint {
         radiuslen := PointsDistance(start, origin)
         radius := start.Sub(origin)
         sides := int(SIDE_RATIO * radiuslen)
-        maxsides := int(SIDE_RATIO * radiuslen * ca.angle / (2*math.Pi))
+        maxsides := int(SIDE_RATIO * radiuslen * ca.angle / (2*math.Pi)) + 1
         start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
         if radius.X < 0 { start_ang -= math.Pi }
         module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
@@ -634,13 +634,15 @@ func (circle *CircleArc) RotatePoints(origin image.Point, angle float64){
 func (circle  *CircleArc) MirrorX() {
     circle.start.X  = -circle.start.X
     circle.center.X = -circle.center.X
-    circle.angle    = -circle.angle
+    circle.angle    = circle.angle
+    circle.start    = RotatePoint(circle.start, circle.center, -circle.angle)
 }
 
 func (circle  *CircleArc) MirrorY() {
     circle.start.Y  = -circle.start.Y
     circle.center.Y = -circle.center.Y
-    circle.angle    = -circle.angle
+    circle.angle    = circle.angle
+    circle.start    = RotatePoint(circle.start, circle.center, -circle.angle)
 }
 
 func (circle *CircleArc) Clone() Drawable {
@@ -876,14 +878,20 @@ func CircleArcCreator (clickchan <-chan image.Point, kbchan chan int, out chan c
     }
     counter_id++
     angle := Angle(points[0], points[1], points[2])
-    ca := CircleArc{points[0], points[1], angle, CurrentFigProps(), Id{counter_id}}
+    fmt.Println("Angulo: ", angle)
+    var ca CircleArc
+    if angle > 0 {
+      ca = CircleArc{points[0], points[1], angle, CurrentFigProps(), Id{counter_id}}
+    } else {
+      ca = CircleArc{points[0], points[1], angle+2*math.Pi, CurrentFigProps(), Id{counter_id}}
+    }
     out <- RegisterPoints(CurrentFilters()(ca.PointChan()), &ca)
 }
 
 func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint, sides int) {
     if sides < 3 {
         fmt.Println("Numero de lados invalido, lados:", sides)
-		return
+        return
     }
     fmt.Println("Desenhar Poligono Regular")
     points := [2]image.Point{}
