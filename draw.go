@@ -110,8 +110,9 @@ func SearchNearPoint (point image.Point) (Drawable, image.Point) {
     return nil, point
 }
 
-var currentColor = image.RGBAColor{255, 255, 255, 255}
-var dashStyle    = 0
+var currentColor     = image.RGBAColor{255, 255, 255, 255}
+var currentDashStyle = 0
+var currentThick     = false
 
 const (
     SOLID = 0
@@ -130,6 +131,7 @@ type Line struct {
     end image.Point
     color image.RGBAColor
     dotted int
+    thick bool
     id int
 }
 
@@ -137,6 +139,7 @@ type Poligon struct {
     points *list.List
     color image.RGBAColor
     dotted int
+    thick bool
     id int
 }
 
@@ -221,8 +224,14 @@ func (line *Line) PointChan() chan ColorPoint {
             }
             if showpoint {
                 if steep {
+                    if line.thick {
+                        pointchan <- ColorPoint{image.Point{y+1, x}, line.color, nil}
+                    }
                     pointchan <- ColorPoint{image.Point{y, x}, line.color, nil}
                 } else {
+                    if line.thick {
+                        pointchan <- ColorPoint{image.Point{x, y+1}, line.color, nil}
+                    }
                     pointchan <- ColorPoint{image.Point{x, y}, line.color, nil}
                 }
             }
@@ -284,6 +293,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     MoveHandler(clickchan, kbchan, out)
                 case 't':
                     DashHandler()
+                case 'b':
+                    ThickHandler()
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -295,15 +306,25 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
 }
 
 func DashHandler() {
-    dashStyle ++
-    dashStyle %= 3
-    switch dashStyle {
+    currentDashStyle ++
+    currentDashStyle %= 3
+    switch currentDashStyle {
     case SOLID:
         fmt.Println("Style: solid")
     case DOTTED:
         fmt.Println("Style: dotted")
     case DASHED:
         fmt.Println("Style: dashed")
+    }
+}
+
+func ThickHandler() {
+    if currentThick {
+        currentThick = false
+        fmt.Println("Thick: no")
+    } else {
+        currentThick = true
+        fmt.Println("Thick: yes")
     }
 }
 
@@ -314,7 +335,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     for_breaker := false
     var p1 image.Point
     var p2 image.Point
-    poligon := Poligon{points, currentColor, dashStyle, 0}
+    poligon := Poligon{points, currentColor, currentDashStyle, currentThick, 0}
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
@@ -323,7 +344,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
             if i > 0 {
                 p1 = p2
                 p2 = p
-                line := Line{p1, p2, currentColor, dashStyle, 0}
+                line := Line{p1, p2, currentColor, currentDashStyle, currentThick, 0}
                 out <- RegisterPoints(line.PointChan(), &poligon)
             } else {
                 p2 = p
@@ -337,7 +358,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
         }
     }
     if i > 0 {
-        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, dashStyle, 0}
+        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, currentDashStyle, currentThick, 0}
         out <- RegisterPoints(line.PointChan(), &poligon)
     }
     counter_id++
@@ -355,7 +376,7 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
             aftertemp := <-points
             if aftertemp == nil { break }
             after = aftertemp.(image.Point)
-            line := Line{before, after, poligon.color, poligon.dotted, 0}
+            line := Line{before, after, poligon.color, poligon.dotted, poligon.thick, 0}
             linechan := line.PointChan()
             for ! closed(linechan) {
                 outchan <- <- linechan
@@ -363,7 +384,7 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
             before = after
         }
         // Line to close poligon
-        line := Line{before, first, poligon.color, poligon.dotted, 0}
+        line := Line{before, first, poligon.color, poligon.dotted, poligon.thick, 0}
         linechan := line.PointChan()
         for ! closed(linechan) {
             outchan <- <- linechan
@@ -430,7 +451,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
             return
         }
     }
-    line := Line{pa[0], pa[1], currentColor, dashStyle, 0}
+    line := Line{pa[0], pa[1], currentColor, currentDashStyle, currentThick, 0}
     out <- RegisterPoints(line.PointChan(), &line)
     counter_id++
     (&line).SetId(counter_id)
