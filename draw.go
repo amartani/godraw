@@ -34,8 +34,8 @@ var currentColor     = image.RGBAColor{255, 255, 255, 255}
 var currentDashStyle = 0
 var currentThick     = false
 
-var windowactive = false
-var currentwindow = Window{}
+var windowactive = true
+var currentwindow = Window{image.Point{10, 300}, image.Point{110, 400}, image.Point{300,10}, 4}
 
 /* Functions for the Matrix */
 
@@ -668,12 +668,14 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
 
 func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
-        wfilter := WindowFilter(Window{image.Point{10, 300}, image.Point{110, 400}, image.Point{300,10}, 4})
-        return wfilter(FilterInvalidPoints(in))
+        if windowactive {
+            in = WindowFilter(&currentwindow)(in)
+        }
+        return FilterInvalidPoints(in)
     }
 }
 
-func WindowFilter(window Window) (func (chan ColorPoint) chan ColorPoint) {
+func WindowFilter(window *Window) (func (chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
         out := make(chan ColorPoint)
         go func() {
