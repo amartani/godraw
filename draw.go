@@ -161,7 +161,17 @@ type Drawable interface {
 }
 
 func (colorpoint ColorPoint) Valid() bool {
-    if colorpoint.point.X == -1 {
+    point := colorpoint.point
+    if point.X < 0 {
+        return false
+    }
+    if point.Y < 0 {
+        return false
+    }
+    if point.X >= WMAX {
+        return false
+    }
+    if point.Y >= HMAX {
         return false
     }
     return true
@@ -270,6 +280,21 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     return out
 }
 
+    func FilterInvalidPoints(in chan ColorPoint) (out chan ColorPoint) {
+    out = make(chan ColorPoint)
+    go func() {
+        for ! closed(in) {
+            point := <-in
+            if point.Valid() {
+                out <- point
+            } else {
+            }
+        }
+        close(out)
+    }()
+    return out
+}
+
 func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan ColorPoint {
     out := make(chan chan ColorPoint)
     go func() {
@@ -345,7 +370,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
                 p1 = p2
                 p2 = p
                 line := Line{p1, p2, currentColor, currentDashStyle, currentThick, 0}
-                out <- RegisterPoints(line.PointChan(), &poligon)
+                out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
             } else {
                 p2 = p
             }
@@ -359,7 +384,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     }
     if i > 0 {
         line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, currentDashStyle, currentThick, 0}
-        out <- RegisterPoints(line.PointChan(), &poligon)
+        out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
     }
     counter_id++
     (&poligon).SetId(counter_id)
@@ -421,7 +446,7 @@ func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
 func Delete(drawable Drawable, out chan chan ColorPoint) {
     blackpoints := make(chan ColorPoint)
     out <- blackpoints
-    colorpoints := drawable.PointChan()
+    colorpoints := FilterInvalidPoints(drawable.PointChan())
     for ! closed(colorpoints) {
         point := <-colorpoints
         RemoveFromMatrix(point.point, drawable);
@@ -452,7 +477,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
         }
     }
     line := Line{pa[0], pa[1], currentColor, currentDashStyle, currentThick, 0}
-    out <- RegisterPoints(line.PointChan(), &line)
+    out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &line)
     counter_id++
     (&line).SetId(counter_id)
 }
@@ -496,7 +521,7 @@ func MoveHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan C
                 fmt.Println("Move (%d, %d)", moviment.X, moviment.Y)
                 Delete(drawable, out)
                 drawable.Move(moviment)
-                out <- RegisterPoints(drawable.PointChan(), drawable)
+                out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
                 return
             }
         case <-kbchan:
