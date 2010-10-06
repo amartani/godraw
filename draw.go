@@ -465,10 +465,10 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
     return outchan
 }
 
-func (poligon *Poligon) Move(point image.Point) {
+func (poligon *Poligon) Move(delta image.Point) {
     for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
         point := elem.Value.(image.Point)
-        point = point.Add(point)
+        point = point.Add(delta)
         elem.Value = point
     }
 }
