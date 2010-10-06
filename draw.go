@@ -143,6 +143,13 @@ type Poligon struct {
     Id
 }
 
+type RegularPoligon struct {
+    origin  image.Point
+    start   image.Point
+    sides   int
+    Id
+}
+
 type ColorPoint struct {
     point image.Point
     color image.RGBAColor
@@ -378,21 +385,34 @@ func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out c
             break
         }
     }
-    radius := points[1].Sub(points[0])
+    counter_id++
+    regpol := RegularPoligon{points[0], points[1], sides, Id{counter_id}}
+    out <- RegisterPoints(FilterInvalidPoints(regpol.PointChan()), &regpol)
+}
+
+func (regpol *RegularPoligon) PointChan() chan ColorPoint {
+    start := regpol.start
+    origin := regpol.origin
+    sides := regpol.sides
+    radius := start.Sub(origin)
     start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
     if radius.X < 0 { start_ang -= math.Pi }
-    fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", points[0], " Inicio:", points[1], " Vetor Inicial:", radius)
+    fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", origin, " Inicio:", start, " Vetor Inicial:", radius)
     module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
     theta := 2*math.Pi/float64(int(sides))
     poli_points := new(list.List)
     for i := 0; i < sides; i++ {
-        p := points[0].Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
+        p := origin.Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
         poli_points.PushBack(p)
         fmt.Println("Ponto: ", p)
     }
-    counter_id++
-    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{counter_id}}
-    out <- RegisterPoints(FilterInvalidPoints(poligon.PointChan()), &poligon)
+    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{0}}
+    return poligon.PointChan()
+}
+
+func (regpol *RegularPoligon) Move(delta image.Point) {
+    regpol.origin = regpol.origin.Add(delta)
+    regpol.start  = regpol.start .Add(delta)
 }
 
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
