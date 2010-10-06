@@ -614,6 +614,10 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     return out
 }
 
+func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
+    return func(in chan ColorPoint) chan ColorPoint { return FilterInvalidPoints(in) }
+}
+
 func FilterInvalidPoints(in chan ColorPoint) (out chan ColorPoint) {
     out = make(chan ColorPoint)
     go func() {
@@ -628,6 +632,7 @@ func FilterInvalidPoints(in chan ColorPoint) (out chan ColorPoint) {
     }()
     return out
 }
+
 
 func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan ColorPoint {
     out := make(chan chan ColorPoint)
@@ -746,7 +751,7 @@ func CircleCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan
     }
     counter_id++
     circle := Circle{points[0], points[1], CurrentFigProps(), Id{counter_id}}
-    out <- RegisterPoints(FilterInvalidPoints(circle.PointChan()), &circle)
+    out <- RegisterPoints(CurrentFilters()(circle.PointChan()), &circle)
 }
 
 func CircleArcCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
@@ -769,7 +774,7 @@ func CircleArcCreator (clickchan <-chan image.Point, kbchan chan int, out chan c
     counter_id++
     angle := Angle(points[0], points[1], points[2])
     ca := CircleArc{points[0], points[1], angle, CurrentFigProps(), Id{counter_id}}
-    out <- RegisterPoints(FilterInvalidPoints(ca.PointChan()), &ca)
+    out <- RegisterPoints(CurrentFilters()(ca.PointChan()), &ca)
 }
 
 func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint, sides int) {
@@ -795,7 +800,7 @@ func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out c
     }
     counter_id++
     regpol := RegularPoligon{points[0], points[1], sides, CurrentFigProps(), Id{counter_id}}
-    out <- RegisterPoints(FilterInvalidPoints(regpol.PointChan()), &regpol)
+    out <- RegisterPoints(CurrentFilters()(regpol.PointChan()), &regpol)
 }
 
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
@@ -815,7 +820,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
                 p1 = p2
                 p2 = p
                 line := Line{p1, p2, CurrentFigProps(), Id{0}}
-                out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
+                out <- RegisterPoints(CurrentFilters()(line.PointChan()), &poligon)
             } else {
                 p2 = p
             }
@@ -829,7 +834,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     }
     if i > 0 {
         line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), CurrentFigProps(), Id{0}}
-        out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
+        out <- RegisterPoints(CurrentFilters()(line.PointChan()), &poligon)
     }
     counter_id++
     (&poligon).SetId(counter_id)
@@ -872,7 +877,7 @@ func RotateHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
     }
     Delete(drawable, out)
     drawable.RotatePoints(origin, Angle(origin, point1, point2))
-    out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
+    out <- RegisterPoints(CurrentFilters()(drawable.PointChan()), drawable)
 }
 
 func MirrorHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
@@ -905,7 +910,7 @@ func MirrorHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
         if state == 3 { break }
     }
     mirrored := Mirror(point1, point2, drawable)
-    out <- RegisterPoints(FilterInvalidPoints(mirrored.PointChan()), mirrored)
+    out <- RegisterPoints(CurrentFilters()(mirrored.PointChan()), mirrored)
 }
 
 func Mirror(p1 image.Point, p2 image.Point, drawable Drawable) Drawable{
@@ -953,7 +958,7 @@ func Delete(drawable Drawable, out chan chan ColorPoint) {
     fmt.Println("Deletado")
     blackpoints := make(chan ColorPoint)
     out <- blackpoints
-    colorpoints := FilterInvalidPoints(drawable.PointChan())
+    colorpoints := CurrentFilters()(drawable.PointChan())
     for ! closed(colorpoints) {
         point := <-colorpoints
         RemoveFromMatrix(point.point, drawable);
@@ -975,7 +980,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
         }
     }
     line := Line{pa[0], pa[1], CurrentFigProps(), Id{0}}
-    out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &line)
+    out <- RegisterPoints(CurrentFilters()(line.PointChan()), &line)
     counter_id++
     (&line).SetId(counter_id)
 }
@@ -1019,7 +1024,7 @@ func MoveHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan C
                 fmt.Println("Move (%d, %d)", moviment.X, moviment.Y)
                 Delete(drawable, out)
                 drawable.Move(moviment)
-                out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
+                out <- RegisterPoints(CurrentFilters()(drawable.PointChan()), drawable)
                 return
             }
         case <-kbchan:
