@@ -193,6 +193,7 @@ type Drawable interface {
     GetId() int
     SetId(int)
     Move(image.Point)
+    RotatePoints(image.Point, float64)
 }
 
 type Id struct {
@@ -205,6 +206,23 @@ func (w *Id) GetId() int {
 
 func (w *Id) SetId(id int) {
     w.id = id
+}
+
+func (line *Line) RotatePoints(origin image.Point, angle float64){
+    line.start = RotatePoint(line.start, origin, angle)
+    line.end   = RotatePoint(line.end, origin, angle)
+}
+
+func (poligon *Poligon) RotatePoints(origin image.Point, angle float64){
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        elem.Value = RotatePoint(point, origin, angle)
+    }
+}
+
+func (reg *RegularPoligon) RotatePoints(origin image.Point, angle float64){
+    reg.start  = RotatePoint(reg.start, origin, angle)
+    reg.origin = RotatePoint(reg.origin, origin, angle)
 }
 
 func (colorpoint ColorPoint) Valid() bool {
@@ -361,6 +379,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     DashHandler()
                 case 'b':
                     ThickHandler()
+                case 'g':
+                    RotateHandler(clickchan, kbchan, out)
                 case 'x':
                     origin := image.Point{10, 10}
                     point := image.Point{20, 10}
@@ -551,6 +571,56 @@ func (poligon *Poligon) Move(delta image.Point) {
         point = point.Add(delta)
         elem.Value = point
     }
+}
+
+func RotateHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Rotacionar objeto")
+    state := 0
+    var drawable Drawable
+    var origin image.Point
+    var point1 image.Point
+    var point2 image.Point
+    for {
+        select{
+        case p := <-clickchan:
+            switch(state){
+            case 0:
+                drawable, _ = SearchNearPoint(p)
+                if drawable != nil { state = 1 }
+                break
+            case 1:
+                origin = p
+                fmt.Println("Origem:", origin)
+                state = 2
+                break
+            case 2:
+                point1 = p
+                fmt.Println("Ponto 1:", point1)
+                state = 3
+                break
+            case 3:
+                point2 = p
+                fmt.Println("Ponto 2:", point2)
+                state = 4
+            }
+        case <-kbchan:
+            return
+        }
+        if state == 4 { break }
+    }
+    Delete(drawable, out)
+    drawable.RotatePoints(origin, Angle(origin, point1, point2))
+    out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
+}
+
+func Angle (origin image.Point, point1 image.Point, point2 image.Point) float64 {
+    radius1 := point1.Sub(origin)
+    ang1    := math.Atan(float64(int(radius1.Y))/float64(int(radius1.X)))
+    if radius1.X < 0 { ang1 -= math.Pi }
+    radius2 := point2.Sub(origin)
+    ang2    := math.Atan(float64(int(radius2.Y))/float64(int(radius2.X)))
+    if radius2.X < 0 { ang2 -= math.Pi }
+    return ang2-ang1
 }
 
 func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
