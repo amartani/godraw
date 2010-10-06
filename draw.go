@@ -520,6 +520,23 @@ func (circle *CircleArc) RotatePoints(origin image.Point, angle float64){
     circle.start  = RotatePoint(circle.start, origin, angle)
 }
 
+func (circle  *CircleArc) MirrorX() {
+    circle.start.X  = -circle.start.X
+    circle.center.X = -circle.center.X
+    circle.angle    = -circle.angle
+}
+
+func (circle  *CircleArc) MirrorY() {
+    circle.start.Y  = -circle.start.Y
+    circle.center.Y = -circle.center.Y
+    circle.angle    = -circle.angle
+}
+
+func (circle *CircleArc) Clone() Drawable {
+    counter_id++
+    return &CircleArc{circle.center, circle.start, circle.angle, circle.FigProps, Id{counter_id}}
+}
+
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     out := make(chan image.Point)
     go func() {
