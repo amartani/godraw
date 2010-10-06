@@ -484,7 +484,7 @@ type Grouping struct {
 func (group *Grouping) Degrouping(out chan chan ColorPoint) {
     for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
         drawable := elem.Value.(Drawable).Clone()
-        out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
+        out <- RegisterPoints(CurrentFilters()(drawable.PointChan()), drawable)
     }
     Delete(group, out)
 }
@@ -809,7 +809,7 @@ func GroupingHandler (clickchan <-chan image.Point, kbchan chan int, out chan ch
     counter_id++
     group := Grouping{draws, Id{counter_id}}
     group.DeleteOriginals(out)
-    out <- RegisterPoints(FilterInvalidPoints(group.PointChan()), &group)
+    out <- RegisterPoints(CurrentFilters()(group.PointChan()), &group)
 }
 
 func DashHandler() {
