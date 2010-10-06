@@ -180,6 +180,23 @@ func (w *Id) SetId(id int) {
     w.id = id
 }
 
+func (line *Line) RotatePoints(origin image.Point, angle float64){
+    line.start = RotatePoint(line.start, origin, angle)
+    line.end   = RotatePoint(line.end, origin, angle)
+}
+
+func (poligon *Poligon) RotatePoints(origin image.Point, angle float64){
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        elem.Value = RotatePoint(point, origin, angle)
+    }
+}
+
+func (reg *RegularPoligon) RotatePoints(origin image.Point, angle float64){
+    reg.start  = RotatePoint(reg.start, origin, angle)
+    reg.origin = RotatePoint(reg.origin, origin, angle)
+}
+
 func (colorpoint ColorPoint) Valid() bool {
     point := colorpoint.point
     if point.X < 0 {
@@ -511,33 +528,37 @@ func RotateHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
     var origin image.Point
     var point1 image.Point
     var point2 image.Point
-    select{
+    for {
+        select{
         case p := <-clickchan:
-        switch(state){
-        case 0:
-            drawable, _ = SearchNearPoint(p)
-            if drawable != nil { state = 1 }
-            break
-        case 1:
-            origin = p
-            fmt.Println("Origem:", origin)
-            state = 2
-            break
-        case 2:
-            point1 = p
-            fmt.Println("Ponto 1:", point1)
-            state = 3
-            break
-        case 3:
-            point2 = p
-            fmt.Println("Ponto 2:", point2)
-            state = 4
-        }
-        if state == 4 { break }
+            switch(state){
+            case 0:
+                drawable, _ = SearchNearPoint(p)
+                if drawable != nil { state = 1 }
+                break
+            case 1:
+                origin = p
+                fmt.Println("Origem:", origin)
+                state = 2
+                break
+            case 2:
+                point1 = p
+                fmt.Println("Ponto 1:", point1)
+                state = 3
+                break
+            case 3:
+                point2 = p
+                fmt.Println("Ponto 2:", point2)
+                state = 4
+            }
         case <-kbchan:
             return
+        }
+        if state == 4 { break }
     }
+    Delete(drawable, out)
     drawable.RotatePoints(origin, Angle(origin, point1, point2))
+    out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
 }
 
 func Angle (origin image.Point, point1 image.Point, point2 image.Point) float64 {
