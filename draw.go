@@ -302,20 +302,18 @@ type Poligon struct {
 }
 
 func (poligon *Poligon) MirrorX() {
-    point_list := new(list.List)
     for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
         point := elem.Value.(image.Point)
         point.X = -point.X
-        point_list.PushFront(point)
+        elem.Value = point
     }
 }
 
 func (poligon *Poligon) MirrorY() {
-    point_list := new(list.List)
     for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
         point := elem.Value.(image.Point)
         point.Y = -point.Y
-        point_list.PushFront(point)
+        elem.Value = point
     }
 }
 
