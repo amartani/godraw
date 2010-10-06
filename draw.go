@@ -446,7 +446,7 @@ func (group *Grouping) DeleteOriginals(out chan chan ColorPoint) {
 func (group *Grouping) Clone() Drawable {
     draws_list := new(list.List)
     for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
-        draws_list.PushBack(elem.Value.(Drawable))
+        draws_list.PushBack(elem.Value.(Drawable).Clone())
     }
     counter_id++
     return &Grouping{draws_list, Id{counter_id}}
