@@ -10,7 +10,6 @@ import (
     "image"
     "math"
     "container/list"
-    // "reflect"
 )
 
 const (
@@ -272,6 +271,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     break
                 case 'p':
                     PoligonCreator(clickchan, kbchan, out)
+                case 'r':
+                    RegularPoligonCreator(clickchan, kbchan, out)
                 case 'm':
                     MoveHandler(clickchan, kbchan, out)
                 case 't':
@@ -297,6 +298,29 @@ func DashHandler() {
     case DASHED:
         fmt.Println("Style: dashed")
     }
+}
+
+func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Desenhar Poligono Regular")
+    points := [2]image.Point{}
+    for_breaker := false
+    for i := 0; i < 2; i++ {
+        select {
+        case p := <-clickchan:
+            fmt.Println("Ponto para poligono regular")
+            points[i] = p
+        case <-kbchan:
+            for_breaker = true
+            break
+        }
+        if for_breaker {
+            break
+        }
+    }
+    radius := points[1].Sub(points[0])
+    start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
+    if radius.X < 0 { start_ang -= math.Pi }
+    fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", points[0], " Inicio:", points[1], " Vetor Inicial:", radius)
 }
 
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
