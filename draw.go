@@ -314,7 +314,7 @@ func (poligon *Poligon) MirrorY() {
     point_list := new(list.List)
     for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
         point := elem.Value.(image.Point)
-        point.X = -point.Y
+        point.Y = -point.Y
         point_list.PushFront(point)
     }
 }
@@ -323,7 +323,6 @@ func (poligon *Poligon) Clone() Drawable {
     point_list := new(list.List)
     for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
         point := elem.Value.(image.Point)
-        point.Y = -point.Y
         point_list.PushFront(point)
     }
     counter_id++
