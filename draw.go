@@ -437,6 +437,14 @@ type Grouping struct {
     Id
 }
 
+func (group *Grouping) Degrouping(out chan chan ColorPoint) {
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        drawable := elem.Value.(Drawable).Clone()
+        out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
+    }
+    Delete(group, out)
+}
+
 func (group *Grouping) DeleteOriginals(out chan chan ColorPoint) {
     for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
         Delete(elem.Value.(Drawable), out)
@@ -677,6 +685,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     MirrorHandler(clickchan, kbchan, out)
                 case 'w':
                     GroupingHandler(clickchan, kbchan, out)
+                case 'y':
+                    DegroupingHandler(clickchan, kbchan, out)
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -685,6 +695,24 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
     }()
 
    return out
+}
+
+
+func DegroupingHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Desagrupar Grupamento")
+    for {
+    select {
+        case p := <-clickchan:
+            drawable, _ := SearchNearPoint(p)
+            group, ok := drawable.(*Grouping)
+            if drawable != nil && ok {
+                go group.Degrouping(out)
+                return
+            }
+        case <-kbchan:
+            return
+    }
+    }
 }
 
 func GroupingHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
