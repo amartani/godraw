@@ -205,15 +205,18 @@ func (line *Line) PointChan() chan ColorPoint {
         }
         for x := start.X; x<end.X; x++ {
             progress := x - start.X
+            showpoint := true
             if line.dotted == DOTTED {
                 if progress % 4 >= 2 {
-                    continue
+                    showpoint = false
                 }
             }
-            if steep {
-                pointchan <- ColorPoint{image.Point{y, x}, line.color, nil}
-            } else {
-                pointchan <- ColorPoint{image.Point{x, y}, line.color, nil}
+            if showpoint {
+                if steep {
+                    pointchan <- ColorPoint{image.Point{y, x}, line.color, nil}
+                } else {
+                    pointchan <- ColorPoint{image.Point{x, y}, line.color, nil}
+                }
             }
             error = error - deltay
             if error < 0 {
