@@ -74,8 +74,8 @@ func SearchList(list *list.List, subject interface{}) *list.Element {
         // if reflect.Typeof(elem.Value) != reflect.Typeof(subject) {
         //     continue
         // }
-        if elem.Value.(ColorPoint).drawable.Id() == subject.(Drawable).Id() {
-        //    fmt.Println("Found ", elem.Value.(ColorPoint).drawable.Id(), ":", subject.(Drawable).Id())
+        if elem.Value.(ColorPoint).drawable.GetId() == subject.(Drawable).GetId() {
+        //    fmt.Println("Found ", elem.Value.(ColorPoint).drawable.GetId(), ":", subject.(Drawable).GetId())
             return elem
         }
     }
@@ -132,7 +132,7 @@ type Line struct {
     color image.RGBAColor
     dotted int
     thick bool
-    id int
+    Id
 }
 
 type Poligon struct {
@@ -140,7 +140,7 @@ type Poligon struct {
     color image.RGBAColor
     dotted int
     thick bool
-    id int
+    Id
 }
 
 type ColorPoint struct {
@@ -155,9 +155,21 @@ func (a Line) length() float64 {
 
 type Drawable interface {
     PointChan() chan ColorPoint
-    Id() int
+    GetId() int
     SetId(int)
     Move(image.Point)
+}
+
+type Id struct {
+    id int
+}
+
+func (w *Id) GetId() int {
+    return w.id
+}
+
+func (w *Id) SetId(id int) {
+    w.id = id
 }
 
 func (colorpoint ColorPoint) Valid() bool {
@@ -175,22 +187,6 @@ func (colorpoint ColorPoint) Valid() bool {
         return false
     }
     return true
-}
-
-func (line *Line) Id() int {
-    return line.id
-}
-
-func (poligon *Poligon) Id() int {
-    return poligon.id
-}
-
-func (line *Line) SetId(id int) {
-    line.id = id
-}
-
-func (poligon *Poligon) SetId(id int) {
-    poligon.id = id
 }
 
 // Draw line on the surface
@@ -395,7 +391,7 @@ func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out c
         fmt.Println("Ponto: ", p)
     }
     counter_id++
-    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, counter_id}
+    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{counter_id}}
     out <- RegisterPoints(FilterInvalidPoints(poligon.PointChan()), &poligon)
 }
 
@@ -406,7 +402,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     for_breaker := false
     var p1 image.Point
     var p2 image.Point
-    poligon := Poligon{points, currentColor, currentDashStyle, currentThick, 0}
+    poligon := Poligon{points, currentColor, currentDashStyle, currentThick, Id{0}}
     for i = 0 ; i < 50; i++ {
         select {
         case p := <-clickchan:
@@ -415,7 +411,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
             if i > 0 {
                 p1 = p2
                 p2 = p
-                line := Line{p1, p2, currentColor, currentDashStyle, currentThick, 0}
+                line := Line{p1, p2, currentColor, currentDashStyle, currentThick, Id{0}}
                 out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
             } else {
                 p2 = p
@@ -429,7 +425,7 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
         }
     }
     if i > 0 {
-        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, currentDashStyle, currentThick, 0}
+        line := Line{points.Back().Value.(image.Point), points.Front().Value.(image.Point), currentColor, currentDashStyle, currentThick, Id{0}}
         out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &poligon)
     }
     counter_id++
@@ -447,7 +443,7 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
             aftertemp := <-points
             if aftertemp == nil { break }
             after = aftertemp.(image.Point)
-            line := Line{before, after, poligon.color, poligon.dotted, poligon.thick, 0}
+            line := Line{before, after, poligon.color, poligon.dotted, poligon.thick, Id{0}}
             linechan := line.PointChan()
             for ! closed(linechan) {
                 outchan <- <- linechan
@@ -455,7 +451,7 @@ func (poligon *Poligon) PointChan() chan ColorPoint {
             before = after
         }
         // Line to close poligon
-        line := Line{before, first, poligon.color, poligon.dotted, poligon.thick, 0}
+        line := Line{before, first, poligon.color, poligon.dotted, poligon.thick, Id{0}}
         linechan := line.PointChan()
         for ! closed(linechan) {
             outchan <- <- linechan
@@ -522,7 +518,7 @@ func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan C
             return
         }
     }
-    line := Line{pa[0], pa[1], currentColor, currentDashStyle, currentThick, 0}
+    line := Line{pa[0], pa[1], currentColor, currentDashStyle, currentThick, Id{0}}
     out <- RegisterPoints(FilterInvalidPoints(line.PointChan()), &line)
     counter_id++
     (&line).SetId(counter_id)
