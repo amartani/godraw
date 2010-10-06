@@ -431,6 +431,54 @@ func (regpol *RegularPoligon) PointChan() chan ColorPoint {
     return poligon.PointChan()
 }
 
+// Grouping
+type Grouping struct {
+    draws *list.List
+    Id
+}
+
+func (group *Grouping) Clone() Drawable {
+    return group
+}
+
+func (group *Grouping) PointChan() chan ColorPoint {
+    outchan := make(chan ColorPoint)
+    go func(){
+        for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+            elem_chan := elem.Value.(Drawable).PointChan()
+            for ! closed(elem_chan) {
+                outchan <- <- elem_chan
+            }
+        }
+        close(outchan)
+    }()
+    return outchan
+}
+
+func (group *Grouping) RotatePoints(origin image.Point, angle float64) {
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        elem.Value.(Drawable).RotatePoints(origin, angle)
+    }
+}
+
+func (group *Grouping) Move(delta image.Point) {
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        elem.Value.(Drawable).Move(delta)
+    }
+}
+
+func (group *Grouping) MirrorX() {
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        elem.Value.(Drawable).MirrorX()
+    }
+}
+
+func (group *Grouping) MirrorY() {
+    for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
+        elem.Value.(Drawable).MirrorY()
+    }
+}
+
 // Circle
 type Circle struct {
     center  image.Point
@@ -573,6 +621,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     RotateHandler(clickchan, kbchan, out)
                 case 'z':
                     MirrorHandler(clickchan, kbchan, out)
+                case 'w':
+                    GroupingHandler(clickchan, kbchan, out)
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -581,6 +631,24 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
     }()
 
    return out
+}
+
+func GroupingHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    draws := new(list.List)
+    for {
+        select{
+        case p := <-clickchan:
+            drawable, _ := SearchNearPoint(p)
+            if drawable != nil {
+                draws.PushBack(drawable)
+            }
+        case <-kbchan:
+            return
+        }
+    }
+    counter_id++
+    group := Grouping{draws, Id{counter_id}}
+    out <- RegisterPoints(FilterInvalidPoints(group.PointChan()), &group)
 }
 
 func DashHandler() {
@@ -773,7 +841,7 @@ func Mirror(p1 image.Point, p2 image.Point, drawable Drawable) Drawable{
     var mirrored Drawable
     if math.Fabs(ang) < math.Pi/float64(int(4)) {
         origin := image.Point{0, int(float64(y1-x1*(y2-y1)/(x2-x1)))}
-        ang = math.Pi/float64(int(4))-ang
+        ang = math.Pi/float64(int(2))-ang
         mirrored = drawable.Clone()
         mirrored.RotatePoints(origin, ang)
         mirrored.MirrorX()
