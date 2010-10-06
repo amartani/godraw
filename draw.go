@@ -109,6 +109,7 @@ func SearchNearPoint (point image.Point) (Drawable, image.Point) {
     return nil, point
 }
 
+var currentCounter = 0
 var currentColor = image.RGBAColor{255, 255, 255, 255}
 var dashStyle    = 0
 
@@ -280,7 +281,13 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                 case 'p':
                     PoligonCreator(clickchan, kbchan, out)
                 case 'r':
-                    RegularPoligonCreator(clickchan, kbchan, out)
+                    RegularPoligonCreator(clickchan, kbchan, out, currentCounter)
+                case '+':
+                    currentCounter++
+                    fmt.Println("Contador Generico: ", currentCounter)
+                case '-':
+                    currentCounter--
+                    fmt.Println("Contador Generico: ", currentCounter)
                 case 'm':
                     MoveHandler(clickchan, kbchan, out)
                 case 't':
@@ -308,7 +315,10 @@ func DashHandler() {
     }
 }
 
-func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint, sides int) {
+    if sides < 3 {
+        fmt.Println("Numero de lados invalido, lados:", sides)
+    }
     fmt.Println("Desenhar Poligono Regular")
     points := [2]image.Point{}
     for_breaker := false
@@ -329,6 +339,17 @@ func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out c
     start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
     if radius.X < 0 { start_ang -= math.Pi }
     fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", points[0], " Inicio:", points[1], " Vetor Inicial:", radius)
+    module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
+    theta := 2*math.Pi/float64(int(sides))
+    poli_points := new(list.List)
+    for i := 0; i < sides; i++ {
+        p := points[0].Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
+        poli_points.PushBack(p)
+        fmt.Println("Ponto: ", p)
+    }
+    counter_id++
+    poligon := Poligon{poli_points, currentColor, dashStyle, counter_id}
+    out <- RegisterPoints(poligon.PointChan(), &poligon)
 }
 
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
