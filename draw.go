@@ -19,9 +19,20 @@ const (
     SIDE_RATIO = 0.4 // Ratio for circle sides per radius
 )
 
-var counter_id = 0
+const (
+    SOLID = 0
+    DOTTED = 1
+    DASHED = 2
+)
 
+/* Global Variables */
+
+var counter_id = 0
 var matrix =  new([WMAX][HMAX]list.List)
+var currentCounter = 0
+var currentColor     = image.RGBAColor{255, 255, 255, 255}
+var currentDashStyle = 0
+var currentThick     = false
 
 /* Functions for the Matrix */
 
@@ -66,42 +77,6 @@ func ListMatrix(point image.Point) *list.List {
     return &matrix[point.X][point.Y]
 }
 
-/* End funcions for the Matrix */
-
-/* Helper functions for list.List */
-
-func SearchList(list *list.List, subject interface{}) *list.Element {
-    for elem := list.Front(); elem != nil; elem = elem.Next() {
-        // if reflect.Typeof(elem.Value) != reflect.Typeof(subject) {
-        //     continue
-        // }
-        if elem.Value.(ColorPoint).drawable.GetId() == subject.(Drawable).GetId() {
-        //    fmt.Println("Found ", elem.Value.(ColorPoint).drawable.GetId(), ":", subject.(Drawable).GetId())
-            return elem
-        }
-    }
-    fmt.Println("Not found")
-    return nil
-}
-
-// func MergeLists(list *list.List, list2 *list.List) {
-//     for elem := list2.Front(); elem != nil; elem = elem.Next() {
-//         if SearchList(list, elem.Value) == nil {
-//             list.PushFront(elem.Value)
-//         }
-//     }
-// }
-
-/* End helper funcions for list.List */
-
-/* Helper functions for image.Point */
-
-func PointsDistance(p1 image.Point, p2 image.Point) float64 {
-    return math.Sqrt(math.Pow(float64(p1.X - p2.X), 2) + math.Pow(float64(p1.Y - p2.Y), 2))
-}
-
-/* End helper functions for image.Point */
-
 func SearchNearPoint (point image.Point) (Drawable, image.Point) {
     for radius := 0; radius < SEARCH_RADIUS; radius++ {
         for x := point.X - radius; x <= point.X + radius; x++ {
@@ -118,16 +93,46 @@ func SearchNearPoint (point image.Point) (Drawable, image.Point) {
     return nil, point
 }
 
-var currentCounter = 0
-var currentColor     = image.RGBAColor{255, 255, 255, 255}
-var currentDashStyle = 0
-var currentThick     = false
+/* End funcions for the Matrix */
 
-const (
-    SOLID = 0
-    DOTTED = 1
-    DASHED = 2
-)
+/* Helper functions for list.List */
+
+func SearchList(list *list.List, subject interface{}) *list.Element {
+    for elem := list.Front(); elem != nil; elem = elem.Next() {
+        if elem.Value.(ColorPoint).drawable.GetId() == subject.(Drawable).GetId() {
+            return elem
+        }
+    }
+    fmt.Println("Not found")
+    return nil
+}
+
+/* End helper funcions for list.List */
+
+/* Helper functions for image.Point */
+
+func PointsDistance(p1 image.Point, p2 image.Point) float64 {
+    return math.Sqrt(math.Pow(float64(p1.X - p2.X), 2) + math.Pow(float64(p1.Y - p2.Y), 2))
+}
+
+func Angle (origin image.Point, point1 image.Point, point2 image.Point) float64 {
+    radius1 := point1.Sub(origin)
+    ang1    := math.Atan(float64(int(radius1.Y))/float64(int(radius1.X)))
+    if radius1.X < 0 { ang1 -= math.Pi }
+    radius2 := point2.Sub(origin)
+    ang2    := math.Atan(float64(int(radius2.Y))/float64(int(radius2.X)))
+    if radius2.X < 0 { ang2 -= math.Pi }
+    return ang2-ang1
+}
+
+func RotatePoint(point image.Point, origin image.Point, angle float64) image.Point {
+    delta := point.Sub(origin)
+    x := float64(int(delta.X))*math.Cos(angle) - float64(int(delta.Y))*math.Sin(angle)
+    y := float64(int(delta.X))*math.Sin(angle) + float64(int(delta.Y))*math.Cos(angle)
+    return image.Point{int(float64(x)), int(float64(y))}.Add(origin)
+}
+
+/* End helper functions for image.Point */
 
 
 func abs(n int) int {
@@ -135,62 +140,29 @@ func abs(n int) int {
     return -n
 }
 
-type Line struct {
-    start image.Point
-    end image.Point
-    color image.RGBAColor
-    dotted int
-    thick bool
-    Id
-}
-
-type Poligon struct {
-    points *list.List
-    color image.RGBAColor
-    dotted int
-    thick bool
-    Id
-}
-
-type RegularPoligon struct {
-    origin  image.Point
-    start   image.Point
-    sides   int
-    Id
-}
-
-/* Circle definition */
-
-type Circle struct {
-    center  image.Point
-    start   image.Point
-    Id
-}
-
-/* Circle methods */
-
-func (circle *Circle) PointChan() chan ColorPoint {
-    radius := PointsDistance(circle.start, circle.center)
-    sides := int(SIDE_RATIO * radius)
-    fmt.Println("DEBUG: Circle sides: %d", sides)
-    regpol := RegularPoligon{circle.center, circle.start, sides, Id{0}}
-    return regpol.PointChan()
-}
-
-func (circle *Circle) Move(delta image.Point) {
-    circle.center   = circle.center.Add(delta)
-    circle.start    = circle.start.Add(delta)
-}
-
-func (circle *Circle) RotatePoints(origin image.Point, angle float64){
-    circle.center = RotatePoint(circle.center, origin, angle)
-    circle.start  = RotatePoint(circle.start, origin, angle)
-}
+/* Definitions */
 
 type ColorPoint struct {
     point image.Point
     color image.RGBAColor
     drawable *Drawable
+}
+
+func (colorpoint ColorPoint) Valid() bool {
+    point := colorpoint.point
+    if point.X < 0 {
+        return false
+    }
+    if point.Y < 0 {
+        return false
+    }
+    if point.X >= WMAX {
+        return false
+    }
+    if point.Y >= HMAX {
+        return false
+    }
+    return true
 }
 
 type Drawable interface {
@@ -213,38 +185,19 @@ func (w *Id) SetId(id int) {
     w.id = id
 }
 
+// Line
+type Line struct {
+    start image.Point
+    end image.Point
+    color image.RGBAColor
+    dotted int
+    thick bool
+    Id
+}
+
 func (line *Line) RotatePoints(origin image.Point, angle float64){
     line.start = RotatePoint(line.start, origin, angle)
     line.end   = RotatePoint(line.end, origin, angle)
-}
-
-func (poligon *Poligon) RotatePoints(origin image.Point, angle float64){
-    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
-        point := elem.Value.(image.Point)
-        elem.Value = RotatePoint(point, origin, angle)
-    }
-}
-
-func (reg *RegularPoligon) RotatePoints(origin image.Point, angle float64){
-    reg.start  = RotatePoint(reg.start, origin, angle)
-    reg.origin = RotatePoint(reg.origin, origin, angle)
-}
-
-func (colorpoint ColorPoint) Valid() bool {
-    point := colorpoint.point
-    if point.X < 0 {
-        return false
-    }
-    if point.Y < 0 {
-        return false
-    }
-    if point.X >= WMAX {
-        return false
-    }
-    if point.Y >= HMAX {
-        return false
-    }
-    return true
 }
 
 // Draw line on the surface
@@ -314,6 +267,123 @@ func (line *Line) Move (dest image.Point) {
     line.start = line.start.Add(dest)
     line.end   = line.end.Add(dest)
 }
+
+// Poligon
+type Poligon struct {
+    points *list.List
+    color image.RGBAColor
+    dotted int
+    thick bool
+    Id
+}
+
+func (poligon *Poligon) RotatePoints(origin image.Point, angle float64){
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        elem.Value = RotatePoint(point, origin, angle)
+    }
+}
+
+func (poligon *Poligon) PointChan() chan ColorPoint {
+    outchan := make(chan ColorPoint)
+    go func() {
+        points := poligon.points.Iter()
+        first := (<-points).(image.Point)
+        before := first
+        var after image.Point
+        for ! closed(points) {
+            aftertemp := <-points
+            if aftertemp == nil { break }
+            after = aftertemp.(image.Point)
+            line := Line{before, after, poligon.color, poligon.dotted, poligon.thick, Id{0}}
+            linechan := line.PointChan()
+            for ! closed(linechan) {
+                outchan <- <- linechan
+            }
+            before = after
+        }
+        // Line to close poligon
+        line := Line{before, first, poligon.color, poligon.dotted, poligon.thick, Id{0}}
+        linechan := line.PointChan()
+        for ! closed(linechan) {
+            outchan <- <- linechan
+        }
+        close(outchan)
+    }()
+    return outchan
+}
+
+func (poligon *Poligon) Move(delta image.Point) {
+    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
+        point := elem.Value.(image.Point)
+        point = point.Add(delta)
+        elem.Value = point
+    }
+}
+
+// Regular Poligon
+type RegularPoligon struct {
+    origin  image.Point
+    start   image.Point
+    sides   int
+    Id
+}
+
+func (regpol *RegularPoligon) Move(delta image.Point) {
+    regpol.origin = regpol.origin.Add(delta)
+    regpol.start  = regpol.start .Add(delta)
+}
+
+func (reg *RegularPoligon) RotatePoints(origin image.Point, angle float64){
+    reg.start  = RotatePoint(reg.start, origin, angle)
+    reg.origin = RotatePoint(reg.origin, origin, angle)
+}
+
+func (regpol *RegularPoligon) PointChan() chan ColorPoint {
+    start := regpol.start
+    origin := regpol.origin
+    sides := regpol.sides
+    radius := start.Sub(origin)
+    start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
+    if radius.X < 0 { start_ang -= math.Pi }
+    fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", origin, " Inicio:", start, " Vetor Inicial:", radius)
+    module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
+    theta := 2*math.Pi/float64(int(sides))
+    poli_points := new(list.List)
+    for i := 0; i < sides; i++ {
+        p := origin.Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
+        poli_points.PushBack(p)
+//        fmt.Println("Ponto: ", p)
+    }
+    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{0}}
+    return poligon.PointChan()
+}
+
+// Circle
+type Circle struct {
+    center  image.Point
+    start   image.Point
+    Id
+}
+
+func (circle *Circle) PointChan() chan ColorPoint {
+    radius := PointsDistance(circle.start, circle.center)
+    sides := int(SIDE_RATIO * radius)
+    fmt.Println("DEBUG: Circle sides: %d", sides)
+    regpol := RegularPoligon{circle.center, circle.start, sides, Id{0}}
+    return regpol.PointChan()
+}
+
+func (circle *Circle) Move(delta image.Point) {
+    circle.center   = circle.center.Add(delta)
+    circle.start    = circle.start.Add(delta)
+}
+
+func (circle *Circle) RotatePoints(origin image.Point, angle float64){
+    circle.center = RotatePoint(circle.center, origin, angle)
+    circle.start  = RotatePoint(circle.start, origin, angle)
+}
+
 
 func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     out := make(chan image.Point)
@@ -386,11 +456,6 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     ThickHandler()
                 case 'g':
                     RotateHandler(clickchan, kbchan, out)
-                case 'x':
-                    origin := image.Point{10, 10}
-                    point := image.Point{20, 10}
-                    angle := math.Pi/float64(int(2))
-                    fmt.Println("Origem:", origin, " Ponto:", point, " Angulo:", angle*180/math.Pi, " Rotacionado:", RotatePoint(point, origin, angle))
                 }
             case <-clickchan:
                fmt.Println("Outro clique")
@@ -472,31 +537,6 @@ func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out c
     out <- RegisterPoints(FilterInvalidPoints(regpol.PointChan()), &regpol)
 }
 
-func (regpol *RegularPoligon) PointChan() chan ColorPoint {
-    start := regpol.start
-    origin := regpol.origin
-    sides := regpol.sides
-    radius := start.Sub(origin)
-    start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
-    if radius.X < 0 { start_ang -= math.Pi }
-    fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", origin, " Inicio:", start, " Vetor Inicial:", radius)
-    module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
-    theta := 2*math.Pi/float64(int(sides))
-    poli_points := new(list.List)
-    for i := 0; i < sides; i++ {
-        p := origin.Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
-        poli_points.PushBack(p)
-//        fmt.Println("Ponto: ", p)
-    }
-    poligon := Poligon{poli_points, currentColor, currentDashStyle, currentThick, Id{0}}
-    return poligon.PointChan()
-}
-
-func (regpol *RegularPoligon) Move(delta image.Point) {
-    regpol.origin = regpol.origin.Add(delta)
-    regpol.start  = regpol.start .Add(delta)
-}
-
 func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar Poligono")
     points := new(list.List)
@@ -532,50 +572,6 @@ func PoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan cha
     }
     counter_id++
     (&poligon).SetId(counter_id)
-}
-
-func RotatePoint(point image.Point, origin image.Point, angle float64) image.Point {
-    delta := point.Sub(origin)
-    x := float64(int(delta.X))*math.Cos(angle) - float64(int(delta.Y))*math.Sin(angle)
-    y := float64(int(delta.X))*math.Sin(angle) + float64(int(delta.Y))*math.Cos(angle)
-    return image.Point{int(float64(x)), int(float64(y))}.Add(origin)
-}
-
-func (poligon *Poligon) PointChan() chan ColorPoint {
-    outchan := make(chan ColorPoint)
-    go func() {
-        points := poligon.points.Iter()
-        first := (<-points).(image.Point)
-        before := first
-        var after image.Point
-        for ! closed(points) {
-            aftertemp := <-points
-            if aftertemp == nil { break }
-            after = aftertemp.(image.Point)
-            line := Line{before, after, poligon.color, poligon.dotted, poligon.thick, Id{0}}
-            linechan := line.PointChan()
-            for ! closed(linechan) {
-                outchan <- <- linechan
-            }
-            before = after
-        }
-        // Line to close poligon
-        line := Line{before, first, poligon.color, poligon.dotted, poligon.thick, Id{0}}
-        linechan := line.PointChan()
-        for ! closed(linechan) {
-            outchan <- <- linechan
-        }
-        close(outchan)
-    }()
-    return outchan
-}
-
-func (poligon *Poligon) Move(delta image.Point) {
-    for elem := poligon.points.Front(); elem != nil; elem = elem.Next() {
-        point := elem.Value.(image.Point)
-        point = point.Add(delta)
-        elem.Value = point
-    }
 }
 
 func RotateHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
@@ -618,16 +614,6 @@ func RotateHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
     out <- RegisterPoints(FilterInvalidPoints(drawable.PointChan()), drawable)
 }
 
-func Angle (origin image.Point, point1 image.Point, point2 image.Point) float64 {
-    radius1 := point1.Sub(origin)
-    ang1    := math.Atan(float64(int(radius1.Y))/float64(int(radius1.X)))
-    if radius1.X < 0 { ang1 -= math.Pi }
-    radius2 := point2.Sub(origin)
-    ang2    := math.Atan(float64(int(radius2.Y))/float64(int(radius2.X)))
-    if radius2.X < 0 { ang2 -= math.Pi }
-    return ang2-ang1
-}
-
 func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Apagar objeto")
     for {
@@ -653,18 +639,9 @@ func Delete(drawable Drawable, out chan chan ColorPoint) {
         RemoveFromMatrix(point.point, drawable);
         color_point := TopMatrixColorPoint(point.point)
         blackpoints <- color_point
-        //MergeLists(redraw, ListMatrix(point.point))
-        //RedrawList(redraw, out)
     }
     close(blackpoints)
 }
-
-// func RedrawList(list *list.List, out chan chan ColorPoint) {
-//     for elem := list.Front(); elem != nil; elem = elem.Next() {
-//         drawable := elem.Value.(ColorPoint).drawable
-//         out <- drawable.PointChan()
-//     }
-// }
 
 func LineCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
     fmt.Println("Desenhar linha")
