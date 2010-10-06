@@ -482,13 +482,32 @@ type CircleArc struct {
 }
 
 func (ca *CircleArc) PointChan() chan ColorPoint {
-//    endpoint := RotatePoint(ca.center, ca.start, ca.angle)
-    circle := Circle{ca.center, ca.start, ca.FigProps, Id{0}}
-    radius := PointsDistance(circle.start, circle.center)
-    sides := int(SIDE_RATIO * radius)
-    fmt.Println("DEBUG: Circle sides: %d", sides)
-    regpol := RegularPoligon{circle.center, circle.start, sides, ca.FigProps, Id{0}}
-    return regpol.PointChan()
+    out := make(chan ColorPoint)
+    go func() {
+        start := ca.start
+        origin := ca.center
+        radiuslen := PointsDistance(start, origin)
+        radius := start.Sub(origin)
+        sides := int(SIDE_RATIO * radiuslen)
+        maxsides := int(SIDE_RATIO * radiuslen * ca.angle / (2*math.Pi))
+        start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
+        if radius.X < 0 { start_ang -= math.Pi }
+        module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
+        theta := 2*math.Pi/float64(int(sides))
+        var before, after image.Point
+        before = start
+        for i := 0; i < maxsides; i++ {
+            after = origin.Add(image.Point{int(float64(module*math.Cos(float64(int(i))*theta+start_ang))), int(float64(module*math.Sin(float64(int(i))*theta+start_ang)))})
+            line := Line{before, after, ca.FigProps, Id{0}}
+            in := line.PointChan()
+            for ! closed(in) {
+                out <- <-in
+            }
+            before = after
+        }
+        close(out)
+    }()
+    return out
 }
 
 func (circle *CircleArc) Move(delta image.Point) {
@@ -557,6 +576,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     RegularPoligonCreator(clickchan, kbchan, out, currentCounter)
                 case 'o':
                     CircleCreator(clickchan, kbchan, out)
+                case 'a':
+                    CircleArcCreator(clickchan, kbchan, out)
                 case '+':
                     currentCounter++
                     fmt.Println("Contador Generico: ", currentCounter)
@@ -626,6 +647,29 @@ func CircleCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan
     counter_id++
     circle := Circle{points[0], points[1], CurrentFigProps(), Id{counter_id}}
     out <- RegisterPoints(FilterInvalidPoints(circle.PointChan()), &circle)
+}
+
+func CircleArcCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Desenhar Arco")
+    points := [3]image.Point{}
+    for_breaker := false
+    for i := 0; i < 3; i++ {
+        select {
+        case p := <-clickchan:
+            fmt.Println("Ponto para circulo")
+            points[i] = p
+        case <-kbchan:
+            for_breaker = true
+            break
+        }
+        if for_breaker {
+            break
+        }
+    }
+    counter_id++
+    angle := Angle(points[0], points[1], points[2])
+    ca := CircleArc{points[0], points[1], angle, CurrentFigProps(), Id{counter_id}}
+    out <- RegisterPoints(FilterInvalidPoints(ca.PointChan()), &ca)
 }
 
 func RegularPoligonCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint, sides int) {
