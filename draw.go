@@ -34,8 +34,7 @@ var currentColor     = image.RGBAColor{255, 255, 255, 255}
 var currentDashStyle = 0
 var currentThick     = false
 
-var windowactive = false
-var currentwindow = Window{}
+var currentWindows = new(list.List)
 
 /* Functions for the Matrix */
 
@@ -783,19 +782,18 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
 
 func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
-        if windowactive {
-            in = WindowFilter(&currentwindow)(in)
+        for elem := currentWindows.Front(); elem != nil; elem = elem.Next() {
+            in = WindowFilter(elem.Value.(Window))(in)
         }
         return FilterInvalidPoints(in)
     }
 }
 
 func RegisterWindow(window Window) {
-    currentwindow  = window
-    windowactive = true
+    currentWindows.PushBack(window)
 }
 
-func WindowFilter(window *Window) (func (chan ColorPoint) chan ColorPoint) {
+func WindowFilter(window Window) (func (chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
         out := make(chan ColorPoint)
         go func() {
@@ -1332,9 +1330,6 @@ func main() {
     kbchan := RWKBChan(context.KeyboardChan());
     clickchan := MouseHandler(context.MouseChan())
     colorpointchanchan := EventProcessor(clickchan, kbchan)
-    go func() {
-        colorpointchanchan <- currentwindow.PointChan()
-    }()
     for {
         select {
         case colorpointchan := <-colorpointchanchan:
