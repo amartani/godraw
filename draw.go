@@ -34,8 +34,8 @@ var currentColor     = image.RGBAColor{255, 255, 255, 255}
 var currentDashStyle = 0
 var currentThick     = false
 
-var windowactive = true
-var currentwindow = Window{image.Point{10, 300}, image.Point{110, 400}, image.Point{300,10}, 4}
+var windowactive = false
+var currentwindow = Window{}
 
 /* Functions for the Matrix */
 
@@ -159,11 +159,19 @@ type Window struct {
 }
 
 func (window Window) PointIn(point image.Point) bool {
-    if point.X < window.first.X { return false }
-    if point.Y < window.first.Y { return false }
-    if point.X > window.last .X { return false }
-    if point.Y > window.last .Y { return false }
+    if point.X <= window.first.X { return false }
+    if point.Y <= window.first.Y { return false }
+    if point.X >= window.last .X { return false }
+    if point.Y >= window.last .Y { return false }
     return true
+}
+
+func (window Window) PointInBorder(point image.Point) bool {
+    if point.X == window.first.X && point.Y >= window.first.Y && point.Y <= window.last.Y { return true }
+    if point.Y == window.first.Y && point.X >= window.first.X && point.X <= window.last.X { return true }
+    if point.X == window.last .X && point.Y >= window.first.Y && point.Y <= window.last.Y { return true }
+    if point.Y == window.last .Y && point.X >= window.first.X && point.X <= window.last.X { return true }
+    return false
 }
 
 func (window Window) Size() (int, int) {
@@ -190,6 +198,111 @@ func (window Window) TransferPoint (point image.Point) image.Point {
     relpoint := point.Sub(window.first)
     zoompoint := image.Point{relpoint.X * zoom, relpoint.Y * zoom}
     return zoompoint.Add(window.target)
+}
+
+func (window Window) PointChan() chan ColorPoint {
+    out := make(chan ColorPoint)
+    go func() {
+        barrier := make(chan bool)
+        p1 := window.first
+        p2 := image.Point{window.last.X, window.first.Y}
+        p3 := window.last
+        p4 := image.Point{window.first.X, window.last.Y}
+        sx, sy := window.TargetSize()
+        p5 := window.target
+        p6 := window.target.Add(image.Point{sx, 0})
+        p7 := window.target.Add(image.Point{sx, sy})
+        p8 := window.target.Add(image.Point{0, sy})
+        figprops := FigProps{image.RGBAColor{255, 255, 0, 255}, SOLID, false}
+        go func() {
+            line := Line{p1, p2, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p2, p3, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p3, p4, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p4, p1, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p5, p6, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p6, p7, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p7, p8, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        go func() {
+            line := Line{p8, p5, figprops, Id{0}}
+            pc := line.PointChan()
+            for ! closed(pc) {
+                out <- <- pc
+            }
+            barrier <- true
+        }()
+        for i := 0; i<8; i++ {
+            <-barrier
+        }
+        close(out)
+    }()
+    return out
+}
+
+func (window Window) RedrawContent() chan ColorPoint {
+    out := make(chan ColorPoint)
+    go func() {
+        for x := window.first.X + 1; x < window.last.X; x++ {
+            for y := window.first.Y + 1; y < window.last.Y; y++ {
+                cp := TopMatrixColorPoint (image.Point{x, y})
+                out <- cp
+    //            cp = window.TransferPoint(cp)
+    //            for sx := 0; sx < window.size; sx++ {
+    //                for sy := 0; sy < window.size; sy++ {
+    //                }
+    //            }
+            }
+        }
+        close(out)
+    }()
+    return out
 }
 
 type ColorPoint struct {
@@ -677,6 +790,11 @@ func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
     }
 }
 
+func RegisterWindow(window Window) {
+    currentwindow  = window
+    windowactive = true
+}
+
 func WindowFilter(window *Window) (func (chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
         out := make(chan ColorPoint)
@@ -685,6 +803,9 @@ func WindowFilter(window *Window) (func (chan ColorPoint) chan ColorPoint) {
                 // Filter things behind towindow
                 cp := <-in
                 if window.PointInTarget(cp.point) {
+                    continue
+                }
+                if window.PointInBorder(cp.point) {
                     continue
                 }
                 // If in window, copy to towindow
@@ -764,6 +885,8 @@ func EventProcessor (clickchan <-chan image.Point, kbchan chan int) chan chan Co
                     MirrorHandler(clickchan, kbchan, out)
                 case 'w':
                     GroupingHandler(clickchan, kbchan, out)
+                case 'q':
+                    WindowCreator(clickchan, kbchan, out)
                 case 'y':
                     DegroupingHandler(clickchan, kbchan, out)
                 }
@@ -1146,6 +1269,28 @@ func MoveHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan C
     }
 }
 
+func WindowCreator (clickchan <-chan image.Point, kbchan chan int, out chan chan ColorPoint) {
+    fmt.Println("Criar janela")
+    points := [3]image.Point{}
+    for_breaker := false
+    for i := 0; i < 3; i++ {
+        select {
+        case p := <-clickchan:
+            points[i] = p
+        case <-kbchan:
+            for_breaker = true
+            break
+        }
+        if for_breaker {
+            break
+        }
+    }
+    window := Window{points[0], points[1], points[2], currentCounter}
+    RegisterWindow(window)
+    out <- window.PointChan()
+    out <- CurrentFilters()(window.RedrawContent())
+}
+
 // Turns kbchan into a read and writable chan
 func RWKBChan (kbchan <-chan int) chan int {
     rwchan := make(chan int);
@@ -1187,6 +1332,9 @@ func main() {
     kbchan := RWKBChan(context.KeyboardChan());
     clickchan := MouseHandler(context.MouseChan())
     colorpointchanchan := EventProcessor(clickchan, kbchan)
+    go func() {
+        colorpointchanchan <- currentwindow.PointChan()
+    }()
     for {
         select {
         case colorpointchan := <-colorpointchanchan:
