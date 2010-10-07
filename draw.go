@@ -199,6 +199,13 @@ func (window Window) TransferPoint (point image.Point) image.Point {
     return zoompoint.Add(window.target)
 }
 
+func (window Window) TransferPointBack (point image.Point) image.Point {
+    zoom := window.zoom
+    relpoint := point.Sub(window.target)
+    zoompoint := image.Point{relpoint.X / zoom, relpoint.Y / zoom}
+    return zoompoint.Add(window.first)
+}
+
 func (window Window) PointChan() chan ColorPoint {
     out := make(chan ColorPoint)
     go func() {
@@ -780,6 +787,28 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
     return out
 }
 
+func MouseClickFilters(in chan image.Point) chan image.Point {
+    out := make(chan image.Point)
+    go func() {
+        for {
+            point := <-in
+            for elem := currentWindows.Front(); elem != nil; elem = elem.Next() {
+                window := elem.Value.(Window)
+                point = WindowClickFilter(window, point)
+            }
+            out <-point
+        }
+    }()
+    return out
+}
+
+func WindowClickFilter(window Window, point image.Point) image.Point {
+    if window.PointInTarget(point) {
+        return window.TransferPointBack(point)
+    }
+    return point
+}
+
 func CurrentFilters() (func(chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
         for elem := currentWindows.Front(); elem != nil; elem = elem.Next() {
@@ -1328,7 +1357,7 @@ func main() {
     context, _ := x11.NewWindow()
     context.FlushImage()
     kbchan := RWKBChan(context.KeyboardChan());
-    clickchan := MouseHandler(context.MouseChan())
+    clickchan := MouseClickFilters(MouseHandler(context.MouseChan()))
     colorpointchanchan := EventProcessor(clickchan, kbchan)
     for {
         select {
