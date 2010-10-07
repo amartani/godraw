@@ -86,7 +86,7 @@ func SearchNearPoint (point image.Point) (Drawable, image.Point) {
             for y := point.Y - radius; y <= point.Y + radius; y++ {
                 drawable := TopMatrix(image.Point{x, y})
                 if drawable != nil {
-                    fmt.Println("Objeto encontrado")
+                    //fmt.Println("Objeto encontrado")
                     return drawable, image.Point{x, y}
                 }
             }
@@ -582,7 +582,7 @@ func (regpol *RegularPoligon) PointChan() chan ColorPoint {
     radius := start.Sub(origin)
     start_ang := math.Atan(float64(int(radius.Y))/float64(int(radius.X)))
     if radius.X < 0 { start_ang -= math.Pi }
-    fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", origin, " Inicio:", start, " Vetor Inicial:", radius)
+    //fmt.Println("Angulo inicial: ", start_ang*180/math.Pi, " Origem: ", origin, " Inicio:", start, " Vetor Inicial:", radius)
     module := math.Sqrt(math.Pow(float64(int(radius.X)), 2)+math.Pow(float64(int(radius.Y)), 2))
     theta := 2*math.Pi/float64(int(sides))
     poli_points := new(list.List)
@@ -688,7 +688,7 @@ func (circle *Circle) Clone() Drawable {
 func (circle *Circle) PointChan() chan ColorPoint {
     radius := PointsDistance(circle.start, circle.center)
     sides := int(SIDE_RATIO * radius)
-    fmt.Println("DEBUG: Circle sides: %d", sides)
+    //fmt.Println("DEBUG: Circle sides: %d", sides)
     regpol := RegularPoligon{circle.center, circle.start, sides, circle.FigProps, Id{0}}
     return regpol.PointChan()
 }
@@ -778,7 +778,7 @@ func MouseHandler(mousechan <-chan draw.Mouse) chan image.Point {
             mouse := <-mousechan
             if clicked == false && mouse.Buttons & 1<<0 == 1<<0 { // botao esquerdo
                 clicked = true
-                fmt.Println("Click: ", mouse.X, ", ", mouse.Y)
+                //fmt.Println("Click: ", mouse.X, ", ", mouse.Y)
                 out <- mouse.Point}
             if clicked == true && mouse.Buttons & 1<<0 == 0 {
                 clicked = false
@@ -1019,7 +1019,7 @@ func CircleArcCreator (clickchan <-chan image.Point, kbchan chan int, out chan c
     for i := 0; i < 3; i++ {
         select {
         case p := <-clickchan:
-            fmt.Println("Ponto para circulo")
+            fmt.Println("Ponto para arco")
             points[i] = p
         case <-kbchan:
             for_breaker = true
@@ -1031,7 +1031,7 @@ func CircleArcCreator (clickchan <-chan image.Point, kbchan chan int, out chan c
     }
     counter_id++
     angle := Angle(points[0], points[1], points[2])
-    fmt.Println("Angulo: ", angle)
+    //fmt.Println("Angulo: ", angle)
     var ca CircleArc
     if angle > 0 {
       ca = CircleArc{points[0], points[1], angle, CurrentFigProps(), Id{counter_id}}
@@ -1285,7 +1285,7 @@ func MoveHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan C
             } else {
                 dest := p
                 moviment := dest.Sub(origin)
-                fmt.Println("Move (%d, %d)", moviment.X, moviment.Y)
+                //fmt.Println("Move (%d, %d)", moviment.X, moviment.Y)
                 Delete(drawable, out)
                 drawable.Move(moviment)
                 out <- RegisterPoints(CurrentFilters()(drawable.PointChan()), drawable)
