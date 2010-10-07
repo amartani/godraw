@@ -17,6 +17,7 @@ const (
     WMAX = 800
     SEARCH_RADIUS = 10
     SIDE_RATIO = 0.4 // Ratio for circle sides per radius
+    BUF_SIZE = 100
 )
 
 const (
@@ -207,9 +208,9 @@ func (window Window) TransferPointBack (point image.Point) image.Point {
 }
 
 func (window Window) PointChan() chan ColorPoint {
-    out := make(chan ColorPoint)
+    out := make(chan ColorPoint, BUF_SIZE)
     go func() {
-        barrier := make(chan bool)
+        barrier := make(chan bool, 8)
         p1 := window.first
         p2 := image.Point{window.last.X, window.first.Y}
         p3 := window.last
@@ -293,7 +294,7 @@ func (window Window) PointChan() chan ColorPoint {
 }
 
 func (window Window) RedrawContent() chan ColorPoint {
-    out := make(chan ColorPoint)
+    out := make(chan ColorPoint, BUF_SIZE)
     go func() {
         for x := window.first.X + 1; x < window.last.X; x++ {
             for y := window.first.Y + 1; y < window.last.Y; y++ {
@@ -398,7 +399,7 @@ func (line *Line) RotatePoints(origin image.Point, angle float64){
 // Draw line on the surface
 // Uses Bresenham's algorithm
 func (line *Line) PointChan() chan ColorPoint {
-    pointchan := make(chan ColorPoint)
+    pointchan := make(chan ColorPoint, BUF_SIZE)
     go func() {
         start := line.start
         end := line.end
@@ -504,7 +505,7 @@ func (poligon *Poligon) RotatePoints(origin image.Point, angle float64){
 }
 
 func (poligon *Poligon) PointChan() chan ColorPoint {
-    outchan := make(chan ColorPoint)
+    outchan := make(chan ColorPoint, BUF_SIZE)
     go func() {
         points := poligon.points.Iter()
         first := (<-points).(image.Point)
@@ -624,7 +625,7 @@ func (group *Grouping) Clone() Drawable {
 }
 
 func (group *Grouping) PointChan() chan ColorPoint {
-    outchan := make(chan ColorPoint)
+    outchan := make(chan ColorPoint, BUF_SIZE)
     go func(){
         for elem := group.draws.Front(); elem != nil; elem = elem.Next() {
             elem_chan := elem.Value.(Drawable).PointChan()
@@ -712,7 +713,7 @@ type CircleArc struct {
 }
 
 func (ca *CircleArc) PointChan() chan ColorPoint {
-    out := make(chan ColorPoint)
+    out := make(chan ColorPoint, BUF_SIZE)
     go func() {
         start := ca.start
         origin := ca.center
@@ -824,7 +825,7 @@ func RegisterWindow(window Window) {
 
 func WindowFilter(window Window) (func (chan ColorPoint) chan ColorPoint) {
     return func(in chan ColorPoint) chan ColorPoint {
-        out := make(chan ColorPoint)
+        out := make(chan ColorPoint, BUF_SIZE)
         go func() {
             for ! closed(in) {
                 // Filter things behind towindow
@@ -854,7 +855,7 @@ func WindowFilter(window Window) (func (chan ColorPoint) chan ColorPoint) {
 }
 
 func FilterInvalidPoints(in chan ColorPoint) (out chan ColorPoint) {
-    out = make(chan ColorPoint)
+    out = make(chan ColorPoint, BUF_SIZE)
     go func() {
         for ! closed(in) {
             point := <-in
@@ -1219,7 +1220,7 @@ func DeleteHandler (clickchan <-chan image.Point, kbchan chan int, out chan chan
 
 func Delete(drawable Drawable, out chan chan ColorPoint) {
     fmt.Println("Deletado")
-    blackpoints := make(chan ColorPoint)
+    blackpoints := make(chan ColorPoint, BUF_SIZE)
     out <- blackpoints
     colorpoints := CurrentFilters()(drawable.PointChan())
     for ! closed(colorpoints) {
@@ -1340,7 +1341,7 @@ func Draw (surface draw.Image, pointchan chan ColorPoint) {
 }
 
 func RegisterPoints (pointchan chan ColorPoint, drawable Drawable) chan ColorPoint {
-    outchan := make(chan ColorPoint)
+    outchan := make(chan ColorPoint, BUF_SIZE)
     go func() {
         for ! closed(pointchan) {
             colorpoint := <-pointchan
