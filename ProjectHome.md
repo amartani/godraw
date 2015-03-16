@@ -1,0 +1,1 @@
+Educative example of a vectorial drawing program in Go.
